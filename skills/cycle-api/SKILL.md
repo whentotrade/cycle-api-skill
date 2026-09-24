@@ -18,8 +18,8 @@ description: >
 # Cycle Analysis API
 
 Base URL: `https://api.marketzeitgeist.com`
-Auth: `?api_key=YOUR_API_KEY` on every request
-API key: <!-- TODO(Lars): add the sign-up / key request link -->
+Auth: the key in the `X-API-Key` header on every request (`?api_key=` in the query works too, but ends up in logs)
+API key: created on the API page of the app (app.marketzeitgeist.com → Account → API; FSC members: app.cycles.org)
 Live schema (Swagger): https://api.marketzeitgeist.com/specs/index.html?url=/apidocs/v1/swagger.json
 
 This skill explains how to use the API and how to read its results. For exact parameter
@@ -33,6 +33,25 @@ types and response schemas, the live Swagger is authoritative.
 | `references/consensus-guide.md` | Cycle Consensus score: fields, formula, how to read it |
 | `references/crsi-signals.md` | How the API derives `crsiScore` / `crsiSignal` |
 | `pipeline-tester.html` | Browser tool to try the full pipeline with your key |
+
+---
+
+## Key levels — read this first
+
+What a key may do depends on its level. Check `GET /api/me/limits` before choosing a pipeline.
+
+| Level | Market data (`/api/data/*`, `MarketCycles`, `LastTopsAndBottoms`, consensus `score`) | Own data (analysis routes with a body or `?datasetid=`) | Streams |
+|---|---|---|---|
+| **Guest** (free, FSC members) | **no** — these routes answer `403` with a message naming the feature | yes: send the values with the call, or store up to 3 datasets (`PUT /api/datasets/{name}`) and name them with `?datasetid=NAME` | no |
+| Paid tiers | only with the feature `MarketDataAccess` set by the operator | yes, larger datasets | yes, by the tier's number |
+| PRO-level features (`useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`) | need a PRO-level key; otherwise the answer's `license` text says "skipped" and the scores stay 0 | | |
+
+**Guest pipeline:** your closes (at least 100) → `CycleScanner` / `CycleExplorer` / `CRSI` with the array as the body,
+or once `PUT /api/datasets/MYSERIES` with `[{dateUnix, close}, …]` and then `POST /api/cycles/CycleScanner?datasetid=MYSERIES`.
+The "Standard Pipeline" below (symbol search → market data) needs market data by key and is **not** available to Guest.
+
+**Answers:** `401` no valid key · `403` with a message: not in your tier or features, retrying does not help · `429`
+with `Retry-After`: rate limit · `429` with a quota message: the monthly cap (Guest: 2,000 key calls; streams never count).
 
 ---
 
@@ -111,11 +130,11 @@ POST body is always a **raw JSON array of doubles** — never wrapped in an obje
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/Stream/SubmitStreamData` | Submit live stream data *(60 req/min)* |
+| POST | `/api/Stream/SubmitStreamData` | Submit live stream data *(tiers and memberships with streaming; 300 updates per stream and day)* |
 
 ---
 
-## Standard Pipeline
+## Standard Pipeline (market data by key — needs `MarketDataAccess`, not available to Guest)
 
 ```
 SearchSymbols                       → symbolId  (field is symbolId, not tickerid)
@@ -179,7 +198,7 @@ CycleExplorer / CycleScanner / CRSI → pass closes[] as raw JSON array body
 - `amplitude` — cycle amplitude (e.g. 25.0)
 - `minBarNum` — bar index anchoring the cycle trough (used for sine wave plotting)
 - `strength` — raw score (e.g. 2.8), **NOT a percentage**. Use gap-based clustering to find dominant cycles: relative strength differences between peaks matter more than absolute values
-- `stabilityScore` — 0 to 1 range, display as `(score * 100)%`. Values >= 0.5 = good for projection. **Filter out < 0.4 as noise**
+- `stabilityScore` — 0 to 1 range, display as `(score * 100)%`. Values >= 0.5 = good for projection. **Filter out < 0.4 as noise** (PRO-level keys only: without the PRO level every score is 0, see Key levels)
 - `dominantRank` — 1 = most dominant, 0 = not ranked
 - `bartelsValue` — Bartels significance score
 - `spectrum` — full amplitude array for spectrum visualization (requires `includeSpectrum: true`)
@@ -238,7 +257,7 @@ See **Phase strings and scores** below and `references/phase-guide.md` for every
 
 **Filtering guidelines:**
 - Discard peaks with `cycleLength < 30` — too short, dominated by noise
-- Discard peaks with `stabilityScore < 0.4` — unstable, unreliable for projection
+- Discard peaks with `stabilityScore < 0.4` — unstable, unreliable for projection (only when the key has the PRO level; otherwise every score is 0)
 - **Cap cycle length at `dataLength / 3`** — the CRSI endpoint requires approximately 3 full cycle repetitions to compute valid Bollinger-style upper/lower bands. Cycles longer than one-third of the data length will produce `NaN` for the `ub` and `lb` arrays, making band-relative scoring impossible. For example, a 205-bar cycle in a 583-bar dataset (ratio 2.8) returns all-NaN bands. Filter these out before selecting the dominant cycle for CRSI tuning.
 - When selecting dominant cycles, look for natural strength gaps between groups rather than using fixed cutoffs
 
@@ -354,9 +373,13 @@ Full detail: `references/phase-guide.md`.
 - Minimum **100 data points** required for all analysis endpoints
 - `minCycleLength` ≥ 20 · `maxCycleLength` ≤ 400
 - Bartels threshold 0–99, default 49 (lower = include weaker cycles)
-- PRO license required: `CycleSpectrumPeakFinder`, `dominantPeakFinder`, `useStability`
-- **Always set `dominantPeakFinder: true` and `useStability: true`** when calling CycleScanner. Without these, `dominantRank` returns 0 for all peaks and `stabilityScore` returns 0, making cycle selection and filtering unreliable. A valid PRO API key is required.
-- Stream endpoint rate limit: 60 requests/minute
+- PRO level required: `CycleSpectrumPeakFinder`, `dominantPeakFinder`, `useStability`. Without a PRO-level key the
+  answer's `license` text says "Stability scoring skipped: PRO level required" and every `stabilityScore` is 0 —
+  **do not filter by `stabilityScore` in that case**, or every cycle is discarded; rank by `strength` instead.
+- With a PRO-level key set `dominantPeakFinder: true` and `useStability: true` when calling CycleScanner.
+- Rate limits are per tier and endpoint group (`GET /api/me/limits`); the Guest cycles limit is 1 call per second,
+  so wait a second between analysis calls.
+- Stream endpoint: 300 updates per allowed stream and day; a stream beyond your number of streams is refused.
 
 ## Common Pitfalls
 
