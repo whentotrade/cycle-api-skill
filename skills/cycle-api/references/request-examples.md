@@ -1,363 +1,232 @@
-# Cycle Tools API — Request Examples
+# Request Examples
 
-Base URL: `https://api.marketzeitgeist.com`
-API Key query param: `?api_key=<key>`
+Base URL `https://api.marketzeitgeist.com`. Every example sends the key in the `X-API-Key` header.
+Values are closes, oldest first, at least 100.
+
+Contents: [curl](#curl) · [Python](#python) · [JavaScript](#javascript) · [C#](#c)
 
 ---
 
-## .NET Core / C# (HttpClient)
+## curl
 
-### SearchSymbols — find a ticker ID
-```csharp
-var apiKey = Environment.GetEnvironmentVariable("CYCLE_TOOLS_API_KEY")
-             ?? throw new InvalidOperationException("CYCLE_TOOLS_API_KEY not set");
+```bash
+KEY=YOUR_KEY
+API=https://api.marketzeitgeist.com
 
-using var client = new HttpClient();
+# What can this key do?
+curl -H "X-API-Key: $KEY" $API/api/me/limits
 
-var url = $"https://api.marketzeitgeist.com/api/data/SearchSymbols?api_key={apiKey}&search=Apple&limit=5";
-var result = await client.GetStringAsync(url);
-// Returns JSON array: [{ "tickerid": "AAPL.US-D-1:FSC1", "name": "Apple Inc.", ... }]
-```
+# 1. Scan a series sent in the body
+curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+     -X POST "$API/api/cycles/CycleScanner?minCycleLength=10&maxCycleLength=200" \
+     -d "[101.2, 101.9, 102.4, 101.7, ...]"
 
-### UpdateDataset — two-step orchestration (mirrors MCP server logic)
-```csharp
-// Step 1: EnsureCompleteDataset
-var unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-var ensureUrl = $"https://api.marketzeitgeist.com/api/data/EnsureCompleteDataset" +
-                $"?api_key={apiKey}&tickerId={tickerId}&unixFrom=0&unixTo={unixNow}&lastclose=true";
+# 2. Store it once ...
+curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+     -X PUT $API/api/datasets/MYSERIES \
+     -d '[{"dateUnix": 1758672000, "close": 101.2}, {"dateUnix": 1758758400, "close": 101.9}]'
 
-var request = new HttpRequestMessage(HttpMethod.Get, ensureUrl);
-request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-var response = await client.SendAsync(request);
-response.EnsureSuccessStatusCode();
-var json = await response.Content.ReadAsStringAsync();
+# ... then analyse it by name (no body); -i shows the X-Dataset-* headers
+curl -i -H "X-API-Key: $KEY" -X POST "$API/api/cycles/CycleScanner?datasetid=MYSERIES&maxbars=500"
+curl -H "X-API-Key: $KEY" -X POST \
+     "$API/api/cycles/CycleExplorer?datasetid=MYSERIES&minCycleLength=30&maxCycleLength=200&plotForward=50"
 
-using var doc = JsonDocument.Parse(json);
-var root = doc.RootElement;
-var isComplete = root.TryGetProperty("isComplete", out var ic) && ic.GetBoolean();
-var trackingId = root.TryGetProperty("trackingId", out var tp) ? tp.GetString() : null;
+# Append new bars later
+curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+     -X POST $API/api/datasets/MYSERIES/bars -d '[{"dateUnix": 1758844800, "close": 102.4}]'
 
-if (!isComplete && !string.IsNullOrEmpty(trackingId))
-{
-    // Step 2: WaitUntilUpdateCompleted
-    var waitUrl = $"https://api.marketzeitgeist.com/api/data/WaitUntilUpdateCompleted" +
-                  $"?api_key={apiKey}&requestId={trackingId}&timeoutSeconds=30";
+# 3. Consensus: the body is an object (or use ?datasetid= and send {})
+curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+     -X POST "$API/api/CycleConsensus/calculate?datasetid=MYSERIES" -d '{"includeCrsi": true}'
 
-    var waitRequest = new HttpRequestMessage(HttpMethod.Get, waitUrl);
-    waitRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    var waitResponse = await client.SendAsync(waitRequest);
-    waitResponse.EnsureSuccessStatusCode();
-    var waitJson = await waitResponse.Content.ReadAsStringAsync();
-    // { "status": true/false, "duration": 1234 }
-}
-// Dataset is now current — proceed to GetDatasetSeries
-```
-
-### GetDatasetSeries — load OHLCV price data
-```csharp
-var url = $"https://api.marketzeitgeist.com/api/data/GetDatasetSeries" +
-          $"?api_key={apiKey}&tickerid=AAPL.US-D-1:FSC1&maxbars=500";
-
-var json = await client.GetStringAsync(url);
-var bars = JsonSerializer.Deserialize<OhlcvBar[]>(json);
-var closes = bars.Select(b => b.Close).ToArray(); // feed into analysis endpoints
-```
-
-### Full pipeline: Search → Update → Load → Analyze
-```csharp
-// 1. Find ticker
-var searchUrl = $"https://api.marketzeitgeist.com/api/data/SearchSymbols?api_key={apiKey}&search=AAPL";
-var symbols = JsonSerializer.Deserialize<SymbolResult[]>(await client.GetStringAsync(searchUrl));
-var tickerId = symbols[0].SymbolId; // field is 'symbolId', not 'tickerid' // e.g. "AAPL.US-D-1:FSC1"
-
-// 2. Ensure data is current (two-step: EnsureCompleteDataset → WaitUntilUpdateCompleted)
-var unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-var ensureUrl = $"https://api.marketzeitgeist.com/api/data/EnsureCompleteDataset?api_key={apiKey}&tickerId={tickerId}&unixFrom=0&unixTo={unixNow}&lastclose=true";
-var ensureReq = new HttpRequestMessage(HttpMethod.Get, ensureUrl);
-ensureReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-var ensureResp = await client.SendAsync(ensureReq);
-var ensureJson = await ensureResp.Content.ReadAsStringAsync();
-using var ensureDoc = JsonDocument.Parse(ensureJson);
-var isComplete = ensureDoc.RootElement.TryGetProperty("isComplete", out var ic) && ic.GetBoolean();
-var trackingId = ensureDoc.RootElement.TryGetProperty("trackingId", out var tp) ? tp.GetString() : null;
-if (!isComplete && !string.IsNullOrEmpty(trackingId))
-{
-    var waitUrl = $"https://api.marketzeitgeist.com/api/data/WaitUntilUpdateCompleted?api_key={apiKey}&requestId={trackingId}&timeoutSeconds=30";
-    var waitReq = new HttpRequestMessage(HttpMethod.Get, waitUrl);
-    waitReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    await client.SendAsync(waitReq);
-}
-
-// 3. Load price series
-var seriesUrl = $"https://api.marketzeitgeist.com/api/data/GetDatasetSeries?api_key={apiKey}&tickerid={tickerId}&maxbars=500";
-var bars = JsonSerializer.Deserialize<OhlcvBar[]>(await client.GetStringAsync(seriesUrl));
-var closes = bars.Select(b => b.Close).ToArray();
-
-// 4. Run cycle analysis
-var analysisUrl = $"https://api.marketzeitgeist.com/api/cycles/CycleExplorer?api_key={apiKey}";
-var body = new StringContent(JsonSerializer.Serialize(closes), Encoding.UTF8, "application/json");
-var cycleResult = await client.PostAsync(analysisUrl, body);
-var cycle = JsonSerializer.Deserialize<DominantCycleAnalysisSet>(
-    await cycleResult.Content.ReadAsStringAsync());
-```
-
-### POST endpoint (e.g. CycleExplorer with raw data)
-```csharp
-var url = $"https://api.marketzeitgeist.com/api/cycles/CycleExplorer" +
-          $"?api_key={apiKey}&minCycleLength=20&maxCycleLength=200";
-
-var json = JsonSerializer.Serialize(closes);
-var content = new StringContent(json, Encoding.UTF8, "application/json");
-var response = await client.PostAsync(url, content);
-var cycle = JsonSerializer.Deserialize<DominantCycleAnalysisSet>(
-    await response.Content.ReadAsStringAsync());
-```
-
-### CRSI example
-```csharp
-var url = $"https://api.marketzeitgeist.com/api/DSP/CRSI?api_key={apiKey}&length=30";
-var content = new StringContent(JsonSerializer.Serialize(closes), Encoding.UTF8, "application/json");
-var response = await client.PostAsync(url, content);
-// Response: { "crsi": [...], "ub": [...], "lb": [...] }
-```
-
-### Response models
-```csharp
-public record DominantCycleAnalysisSet(
-    string Symbol, double Length, double Amplitude,
-    double Phase, string Phase_status, int Phase_score,
-    double Nexttop, double Nextlow, double Lasttop, double Lastlow,
-    int PhasingScore, double CycleProfitability, int Barsused, string StatusCode
-);
-
-public record OhlcvBar(
-    string Date, double Open, double High, double Low, double Close, double Volume
-);
-
-public record SymbolResult(
-    string TickerId, string Name, string Exchange, string Currency, string MarketType
-);
-```
-
-### Error handling
-```csharp
-if (!response.IsSuccessStatusCode)
-{
-    var error = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-    // error.Detail contains the explanation
-}
+# 4. CRSI tuned to a 60-bar cycle (length = half the cycle)
+curl -H "X-API-Key: $KEY" -X POST "$API/api/DSP/CRSI?datasetid=MYSERIES&length=30"
 ```
 
 ---
 
-## JavaScript / TypeScript (fetch)
-
-### SearchSymbols
-```javascript
-const API_KEY = process.env.CYCLE_TOOLS_API_KEY;
-
-const res = await fetch(
-  `https://api.marketzeitgeist.com/api/data/SearchSymbols?api_key=${API_KEY}&search=Apple&limit=5`
-);
-const symbols = await res.json();
-const tickerId = symbols[0].tickerid; // e.g. "AAPL.US-D-1:FSC1"
-```
-
-### UpdateDataset (two-step orchestration)
-```javascript
-const JSON_HEADERS = { "Accept": "application/json", "Content-Type": "application/json" };
-
-// Step 1: EnsureCompleteDataset
-const unixNow = Math.floor(Date.now() / 1000);
-const ensureRes = await fetch(
-  `https://api.marketzeitgeist.com/api/data/EnsureCompleteDataset?api_key=${API_KEY}&tickerId=${tickerId}&unixFrom=0&unixTo=${unixNow}&lastclose=true`,
-  { headers: JSON_HEADERS }
-);
-const ensure = await ensureRes.json();
-// { isComplete: bool, status: string, trackingId: string|null }
-
-if (!ensure.isComplete && ensure.trackingId) {
-  // Step 2: WaitUntilUpdateCompleted
-  await fetch(
-    `https://api.marketzeitgeist.com/api/data/WaitUntilUpdateCompleted?api_key=${API_KEY}&requestId=${ensure.trackingId}&timeoutSeconds=30`,
-    { headers: JSON_HEADERS }
-  );
-  // { status: true/false, duration: ms }
-}
-// Dataset is now current
-```
-
-### GetDatasetSeries + extract closes
-```javascript
-const res = await fetch(
-  `https://api.marketzeitgeist.com/api/data/GetDatasetSeries?api_key=${API_KEY}&tickerid=${tickerId}&maxbars=500`
-);
-const bars = await res.json();
-const closes = bars.map(b => b.close); // ready for analysis endpoints
-```
-
-### Full pipeline in one function
-```javascript
-async function analyzeSymbol(search) {
-  const BASE = "https://api.marketzeitgeist.com";
-
-  // 1. Search
-  const symbols = await fetch(`${BASE}/api/data/SearchSymbols?api_key=${API_KEY}&search=${search}`)
-    .then(r => r.json());
-  const tickerId = symbols[0].tickerid;
-
-  // 2. Update (two-step)
-  const unixNow = Math.floor(Date.now() / 1000);
-  const ensure = await fetch(`${BASE}/api/data/EnsureCompleteDataset?api_key=${API_KEY}&tickerId=${tickerId}&unixFrom=0&unixTo=${unixNow}&lastclose=true`, { headers: JSON_HEADERS }).then(r => r.json());
-  if (!ensure.isComplete && ensure.trackingId) {
-    await fetch(`${BASE}/api/data/WaitUntilUpdateCompleted?api_key=${API_KEY}&requestId=${ensure.trackingId}&timeoutSeconds=30`, { headers: JSON_HEADERS });
-  }
-
-  // 3. Load closes
-  const bars = await fetch(`${BASE}/api/data/GetDatasetSeries?api_key=${API_KEY}&tickerid=${tickerId}&maxbars=500`)
-    .then(r => r.json());
-  const closes = bars.map(b => b.close);
-
-  // 4. Analyze
-  const cycle = await fetch(`${BASE}/api/cycles/CycleExplorer?api_key=${API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(closes)
-  }).then(r => r.json());
-
-  return cycle;
-}
-```
-
-### CycleScanner with spectrum
-```javascript
-const result = await fetch(
-  `https://api.marketzeitgeist.com/api/cycles/CycleScanner?api_key=${API_KEY}&includeSpectrum=true&sortByStrength=true`,
-  { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(closes) }
-).then(r => r.json());
-
-result.peaks.forEach(p =>
-  console.log(`Cycle ${p.cycleLength} bars | Bartels: ${p.bartelsValue} | ${p.phaseStatus}`)
-);
-```
-
----
-
-## Python (requests)
+## Python
 
 ```python
-import requests
-import os
-
-API_KEY = os.environ["CYCLE_TOOLS_API_KEY"]
-BASE = "https://api.marketzeitgeist.com"
-```
-
-### SearchSymbols
-```python
-symbols = requests.get(
-    f"{BASE}/api/data/SearchSymbols",
-    params={"api_key": API_KEY, "search": "Apple", "limit": 5}
-).json()
-ticker_id = symbols[0]["symbolId"]  # field is 'symbolId', not 'tickerid'  # e.g. "AAPL.US-D-1:FSC1"
-```
-
-### UpdateDataset (two-step orchestration)
-```python
-JSON_HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}
-
-# Step 1: EnsureCompleteDataset
 import time
-unix_now = int(time.time())
-ensure = requests.get(
-    f"{BASE}/api/data/EnsureCompleteDataset",
-    params={"api_key": API_KEY, "tickerId": ticker_id, "unixFrom": 0, "unixTo": unix_now, "lastclose": "true"},
-    headers=JSON_HEADERS
-).json()
-# { "isComplete": bool, "status": str, "trackingId": str|None }
+import requests
 
-if not ensure.get("isComplete") and ensure.get("trackingId"):
-    # Step 2: WaitUntilUpdateCompleted
-    requests.get(
-        f"{BASE}/api/data/WaitUntilUpdateCompleted",
-        params={"api_key": API_KEY, "requestId": ensure["trackingId"], "timeoutSeconds": 30},
-        headers=JSON_HEADERS
-    )
-    # { "status": True/False, "duration": ms }
-# Dataset is now current
-```
+API = "https://api.marketzeitgeist.com"
+S = requests.Session()
+S.headers["X-API-Key"] = "YOUR_KEY"
 
-### GetDatasetSeries + extract closes
-```python
-bars = requests.get(
-    f"{BASE}/api/data/GetDatasetSeries",
-    params={"api_key": API_KEY, "tickerid": ticker_id, "maxbars": 500}
-).json()
-closes = [b["close"] for b in bars]
-```
 
-### Full pipeline
-```python
-def analyze_symbol(search_term):
-    # 1. Search
-    symbols = requests.get(f"{BASE}/api/data/SearchSymbols",
-        params={"api_key": API_KEY, "search": search_term}).json()
-    ticker_id = symbols[0]["symbolId"]  # field is 'symbolId', not 'tickerid'
+def call(method, path, **kw):
+    """One request; waits and retries on a rate limit, stops on the monthly cap.
 
-    # 2. Update (two-step)
-    unix_now = int(time.time())
-    ensure = requests.get(f"{BASE}/api/data/EnsureCompleteDataset",
-        params={"api_key": API_KEY, "tickerId": ticker_id, "unixFrom": 0, "unixTo": unix_now, "lastclose": "true"},
-        headers=JSON_HEADERS).json()
-    if not ensure.get("isComplete") and ensure.get("trackingId"):
-        requests.get(f"{BASE}/api/data/WaitUntilUpdateCompleted",
-            params={"api_key": API_KEY, "requestId": ensure["trackingId"], "timeoutSeconds": 30},
-            headers=JSON_HEADERS)
+    Both come back as 429 with Retry-After. The monthly cap waits until the 1st of next month
+    (a JSON body with quotaMonthly); a rate limit waits seconds.
+    """
+    for attempt in range(5):
+        r = S.request(method, API + path, timeout=60, **kw)
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r
+        wait = float(r.headers.get("Retry-After", "1"))
+        if wait > 60:
+            raise RuntimeError(f"Monthly cap or long block, retry after {wait:.0f}s: {r.text}")
+        time.sleep(wait * (1 + attempt))
+    raise RuntimeError("Still rate limited after 5 attempts")
 
-    # 3. Load closes
-    bars = requests.get(f"{BASE}/api/data/GetDatasetSeries",
-        params={"api_key": API_KEY, "tickerid": ticker_id, "maxbars": 500}).json()
-    closes = [b["close"] for b in bars]
 
-    # 4. Analyze
-    return requests.post(
-        f"{BASE}/api/cycles/CycleExplorer",
-        params={"api_key": API_KEY},
-        json=closes
-    ).json()
-```
+closes = [...]      # your values, oldest first
+dates = [...]       # Unix seconds, same length
 
-### Detrend then scan
-```python
-detrended = requests.post(
-    f"{BASE}/api/DSP/Detrend",
-    params={"api_key": API_KEY, "dtype": 0},
-    json=closes
-).json()
+# What can this key do?
+limits = call("GET", "/api/me/limits").json()
+print(limits["tier"], [g["group"] for g in limits["groups"] if g["included"]])
 
-cycles = requests.post(
-    f"{BASE}/api/cycles/CycleScanner",
-    params={"api_key": API_KEY, "humanReadableText": True},
-    json=detrended
-).json()
+# 1. Scan with the values in the body
+scan = call("POST", "/api/cycles/CycleScanner",
+            params={"minCycleLength": 10, "maxCycleLength": 200}, json=closes).json()
+peaks = [p for p in scan["peaks"] if p["cycleLength"] >= 30]
+peaks.sort(key=lambda p: p["strength"], reverse=True)
+# Without a PRO-level key stabilityScore and dominantRank are 0: rank by strength only.
+dominant = peaks[0]
+print(dominant["cycleLength"], dominant["avgPhaseStatus"], dominant["avgPhaseScore"])
+
+# 2. Store once, analyse several times by name
+bars = [{"dateUnix": d, "close": c} for d, c in zip(dates, closes)]
+call("PUT", "/api/datasets/MYSERIES", json=bars)
+
+r = call("POST", "/api/cycles/CycleExplorer",
+         params={"datasetid": "MYSERIES", "minCycleLength": 30,
+                 "maxCycleLength": 200, "plotForward": 50})
+window = {h: r.headers.get(h) for h in ("X-Dataset-Bars", "X-Dataset-First", "X-Dataset-Last")}
+explorer = r.json()
+print(explorer["length"], explorer["phase_status"], explorer["nexttop"], explorer["nextlow"], window)
+
+# 3. Consensus (object body; with datasetid the datapoints come from the dataset)
+consensus = call("POST", "/api/CycleConsensus/calculate",
+                 params={"datasetid": "MYSERIES"}, json={"includeCrsi": True}).json()
+print(consensus["combinedScore"], consensus["crsiSignal"])
+print(consensus["combinedScoreReasoning"])
+
+# 4. CRSI tuned to the dominant cycle, capped at data length / 3
+cycle = min(dominant["cycleLength"], len(closes) / 3)
+crsi = call("POST", "/api/DSP/CRSI",
+            params={"datasetid": "MYSERIES", "length": max(5, round(cycle / 2))}).json()
+last = crsi["crsi"][-1]
+state = "overbought" if last > crsi["ub"][-1] else "oversold" if last < crsi["lb"][-1] else "inside bands"
+print(round(last, 1), state)
 ```
 
 ---
 
-## Common Patterns
+## JavaScript
 
-### Recommended data pipeline
-```
-SearchSymbols → UpdateDataset → GetDatasetSeries → [analysis endpoint]
-```
-Always run `SearchSymbols` first if you don't have a confirmed `tickerid`.  
-Always run `UpdateDataset` before `GetDatasetSeries` when current/live data is needed.
+```javascript
+const API = "https://api.marketzeitgeist.com";
+const KEY = "YOUR_KEY";
 
-### Chaining DSP + Analysis
-Many workflows benefit from pre-processing before analysis:
-1. **GetDatasetSeries** → load price data, extract `.close` array
-2. **Detrend** → remove price drift, isolate cyclical component
-3. **SavGol or SincSmoother** → reduce noise
-4. **CycleScanner** → identify all significant cycles in the spectrum
-5. **CycleExplorer** → get dominant cycle with phase and timing
-6. **CRSI** → momentum oscillator tuned to that cycle length
+async function call(method, path, { params, body } = {}) {
+  const url = new URL(API + path);
+  for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, v);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(url, {
+      method,
+      headers: { "X-API-Key": KEY, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (res.status !== 429) {
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res;
+    }
+    // Rate limit and monthly cap are both 429 + Retry-After; the cap waits until next month.
+    const wait = Number(res.headers.get("Retry-After") ?? 1);
+    if (wait > 60) throw new Error(`Monthly cap or long block (${wait}s): ${await res.text()}`);
+    await new Promise(r => setTimeout(r, wait * 1000 * (1 + attempt)));
+  }
+  throw new Error("Still rate limited after 5 attempts");
+}
+
+const closes = [/* oldest first, at least 100 */];
+const dates = [/* Unix seconds */];
+
+// 1. Scan with the values in the body
+const scan = await (await call("POST", "/api/cycles/CycleScanner", {
+  params: { minCycleLength: 10, maxCycleLength: 200 }, body: closes,
+})).json();
+const peaks = scan.peaks.filter(p => p.cycleLength >= 30).sort((a, b) => b.strength - a.strength);
+
+// 2. Store once, analyse by name
+await call("PUT", "/api/datasets/MYSERIES", {
+  body: dates.map((d, i) => ({ dateUnix: d, close: closes[i] })),
+});
+const res = await call("POST", "/api/cycles/CycleExplorer", {
+  params: { datasetid: "MYSERIES", minCycleLength: 30, maxCycleLength: 200, plotForward: 50 },
+});
+console.log(res.headers.get("X-Dataset-Last"), await res.json());
+
+// 3. Consensus
+const consensus = await (await call("POST", "/api/CycleConsensus/calculate", {
+  params: { datasetid: "MYSERIES" }, body: { includeCrsi: true },
+})).json();
+console.log(consensus.combinedScore, consensus.crsiSignal);
+```
+
+Browsers: the API sends `Access-Control-Allow-Origin: *`, so `fetch` works from a web page. Never
+ship your key in public front-end code; call the API from your server instead.
+
+---
+
+## C#
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+var http = new HttpClient { BaseAddress = new Uri("https://api.marketzeitgeist.com") };
+http.DefaultRequestHeaders.Add("X-API-Key", "YOUR_KEY");
+
+async Task<HttpResponseMessage> Send(Func<HttpRequestMessage> make)
+{
+    for (var attempt = 0; attempt < 5; attempt++)
+    {
+        var res = await http.SendAsync(make());
+        if (res.StatusCode != HttpStatusCode.TooManyRequests)
+        {
+            res.EnsureSuccessStatusCode();
+            return res;
+        }
+        // Rate limit and monthly cap are both 429 + Retry-After; the cap waits until next month.
+        var wait = res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(1);
+        if (wait > TimeSpan.FromSeconds(60))
+            throw new InvalidOperationException($"Monthly cap or long block ({wait}): " + await res.Content.ReadAsStringAsync());
+        await Task.Delay(wait * (1 + attempt));
+    }
+    throw new InvalidOperationException("Still rate limited after 5 attempts");
+}
+
+double[] closes = /* oldest first, at least 100 */ [];
+long[] dates = /* Unix seconds */ [];
+
+// 1. Scan with the values in the body
+var scanRes = await Send(() => new HttpRequestMessage(HttpMethod.Post,
+    "/api/cycles/CycleScanner?minCycleLength=10&maxCycleLength=200") { Content = JsonContent.Create(closes) });
+using var scan = JsonDocument.Parse(await scanRes.Content.ReadAsStringAsync());
+var top = scan.RootElement.GetProperty("peaks").EnumerateArray()
+    .Where(p => p.GetProperty("cycleLength").GetDouble() >= 30)
+    .OrderByDescending(p => p.GetProperty("strength").GetDouble())
+    .First();
+
+// 2. Store once, analyse by name
+var bars = dates.Zip(closes, (d, c) => new { dateUnix = d, close = c });
+await Send(() => new HttpRequestMessage(HttpMethod.Put, "/api/datasets/MYSERIES") { Content = JsonContent.Create(bars) });
+
+var exRes = await Send(() => new HttpRequestMessage(HttpMethod.Post,
+    "/api/cycles/CycleExplorer?datasetid=MYSERIES&minCycleLength=30&maxCycleLength=200&plotForward=50"));
+Console.WriteLine(exRes.Headers.GetValues("X-Dataset-Last").First());
+
+// 3. Consensus: object body
+var cRes = await Send(() => new HttpRequestMessage(HttpMethod.Post,
+    "/api/CycleConsensus/calculate?datasetid=MYSERIES") { Content = JsonContent.Create(new { includeCrsi = true }) });
+using var consensus = JsonDocument.Parse(await cRes.Content.ReadAsStringAsync());
+Console.WriteLine(consensus.RootElement.GetProperty("combinedScore").GetDouble());
+```

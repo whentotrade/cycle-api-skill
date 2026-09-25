@@ -6,13 +6,29 @@ It does not predict where price will be in N days. It tells you whether the domi
 
 ---
 
-## API Endpoints
+## The endpoint
 
-| Method | Path | Use Case |
-|--------|------|----------|
-| GET | `/api/CycleConsensus/score/{symbol}` | Production endpoint — compact score with reasoning for a known symbol |
-| POST | `/api/CycleConsensus/calculate` | Full analysis from raw close prices — includes individual cycle contributions |
-| GET | `/api/CycleConsensus/validate/{symbol}` | Debug — all intermediate pipeline values for verification |
+**POST** `/api/CycleConsensus/calculate` — the consensus score for your own close prices.
+
+The body is an **object**, not a bare array:
+
+```json
+{
+  "datapoints": [101.2, 101.9, 102.4, ...],
+  "bartelsLimit": 10,
+  "minCycleLength": 15,
+  "maxCycleLength": 400,
+  "savgolSmoothing": false,
+  "includeCrsi": true
+}
+```
+
+All fields except `datapoints` are optional (the values shown are the defaults). At least 100 closes,
+oldest first. With a stored dataset, leave `datapoints` out and add `?datasetid=NAME` (plus `maxbars`,
+`from`, `to` for the window); settings like `includeCrsi` can still go in the body.
+
+Pipeline inside: CycleScanner (HP filter detrending) → stability scoring → dominant peak detection →
+consensus → CRSI.
 
 ---
 
@@ -23,53 +39,49 @@ It does not predict where price will be in N days. It tells you whether the domi
 | Property | Type | Range | Description |
 |----------|------|-------|-------------|
 | `combinedScore` | double | -100 to +100 | Final consensus score. Positive = bullish, negative = bearish. Cycles contribute ±80 max, CRSI ±20 max. |
-| `bullishConsensus` | double | 0–100 | Total weighted strength of cycles voting bullish (rising + bottoming phases). |
-| `bearishConsensus` | double | 0–100 | Total weighted strength of cycles voting bearish (falling + topping phases). |
+| `bullishConsensus` | double | 0–100 | Weighted strength of cycles voting bullish (rising + bottoming). |
+| `bearishConsensus` | double | 0–100 | Weighted strength of cycles voting bearish (falling + topping). |
+| `bullishCycleCount` | int | | Cycles in a bullish phase (rising + bottoming). |
+| `bearishCycleCount` | int | | Cycles in a bearish phase (falling + topping). |
+| `breadthFactor` | double | 0–1 | Penalises a consensus carried by only a few cycles. |
+| `combinedScoreReasoning` | string | | Step-by-step text of how the score was derived. |
 
-### Cycle Phase Counts
+### The four phase arrays
 
-| Property | Description | Imminence |
-|----------|-------------|-----------|
-| `toppingCycleCount` | Cycles at or near their peak, turning down | **At the turn** — the reversal is happening now |
-| `bottomingCycleCount` | Cycles at or near their trough, turning up | **At the turn** — the reversal is happening now |
-| `fallingCycleCount` | Cycles declining from peak toward trough | **Approaching** — bearish pressure building |
-| `risingCycleCount` | Cycles ascending from trough toward peak | **Approaching** — bullish pressure building |
-| `bullishCycleCount` | Total bullish = rising + bottoming | Overall bullish cycle count |
-| `bearishCycleCount` | Total bearish = falling + topping | Overall bearish cycle count |
+| Property | Cycles that are … | Imminence |
+|----------|-------------------|-----------|
+| `toppingCycles` | at or near their peak, turning down | **At the turn**: the reversal is happening now |
+| `bottomingCycles` | at or near their trough, turning up | **At the turn**: the reversal is happening now |
+| `fallingCycles` | declining from peak toward trough | **Approaching**: bearish pressure building |
+| `risingCycles` | ascending from trough toward peak | **Approaching**: bullish pressure building |
 
-### Contributing Cycle Lengths
+The number of entries in each array is the count per phase. Each entry (`CycleContributionDto`):
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `bullishCycles` | int[] | Distinct cycle lengths (in bars) contributing to the bullish side (bottoming + rising). Deduplicated, sorted ascending. |
-| `bearishCycles` | int[] | Distinct cycle lengths (in bars) contributing to the bearish side (topping + falling). Deduplicated, sorted ascending. |
+| Field | Meaning |
+|---|---|
+| `cycleLength` | Cycle length in bars |
+| `phaseScore` | −2 topping, −1 falling, +1 rising, +2 bottoming (not the scanner's −100…+100 phase score) |
+| `strength` | Bartels-based strength, 0–100 |
+| `stabilityScore` | 0–1, consistency of amplitude and phase |
+| `rank` | Dominant peak rank (1 = strongest), 0 = unranked |
+| `cycleQuality` | Strength × stability × rank bonus; drives the weighting |
+| `contribution` | What this cycle adds to the bullish or bearish consensus |
+| `reason` | Text: how the contribution was calculated |
+| `amplitude`, `phase`, `avgPhase`, `minBarNum`, `minBarNumCurrent` | The cycle's wave and phase data from the scanner |
 
-These arrays let you inspect *which* cycles vote on each side without calling the heavier `/calculate` endpoint. Useful for filtering ("is the bullish vote driven by a short-cycle cluster or a long-cycle structural signal?") and for charting cycle composition alongside the score.
-
-### App UI parity (Cycle Scanner gauge)
-
-The Cycle Consensus gauge in the Cycle Scanner app UI (app.cycles.org/cyclescanner)
-runs the **same pipeline as the API with CRSI integration enabled** — equivalent to
-`includeCrsi=true` on `/api/CycleConsensus/calculate` (the `score/{symbol}` endpoint
-always integrates CRSI). There is no app setting or URL parameter to disable the CRSI
-term; the app's `crsi=true` URL parameter only toggles the cRSI *chart indicator
-panel*, not the consensus integration. The app falls back to the pure cycle consensus
-(no CRSI term) only when CRSI cannot be computed: fewer than ~50 bars loaded, or the
-derived CRSI length exceeds dataLength/3 (NaN bands).
-
-**If app gauge and API score differ**, the cause is almost always different scan
-inputs — the app uses the scanner's configured band/Bartels/detrend/maxbars and
-closes up to `inSampleTimeEnd`, while the API defaults to `barCount=1150`,
-`bartelsLimit=10`, band 15-400 — not a CRSI on/off difference.
+To see *which* cycle lengths vote on each side, collect `cycleLength` from `bottomingCycles` +
+`risingCycles` (bullish) and `toppingCycles` + `fallingCycles` (bearish). A bullish vote carried by
+short cycles is a different signal from one carried by long, structural cycles.
 
 ### CRSI Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `crsiScore` | int | Raw CRSI score (-3 to +3). Drives signal state and score contribution. |
-| `crsiSignal` | string | Named signal state — see Signal States table below. |
-| `crsiLength` | int | CRSI oscillator period (half the dominant cycle length, clamped 5–50). |
-| `crsiSourceCycleLength` | int | Full cycle length from which CRSI period was derived. |
+| `crsiScore` | int | Raw CRSI score (−3 to +3). Drives the signal state and the score contribution. |
+| `crsiSignal` | string | Named signal state, see below. |
+| `crsiLength` | int | CRSI period (half the dominant cycle length, clamped 5–50). |
+| `crsiSourceCycleLength` | int | The cycle length the CRSI period was derived from. |
+| `hasBullishDivergence`, `hasBearishDivergence` | bool | Price/CRSI divergence near the last bar (pilot: label only, no effect on the score). |
 
 ### CRSI Signal States
 
@@ -85,35 +97,11 @@ Signal states are named from the perspective of the **exhausting trend**. The pr
 | -3 | `BearExit` | -20.0 | Crossed above lower band — bear move exiting oversold |
 | 0 | `Neutral` | 0 | Between bands — no overbought/oversold condition |
 
-**Divergence-confirmed variants** (when price-CRSI divergence is detected alongside Fatigue or Exit):
-- `BullFatigueReversalConfirmed` / `BearFatigueReversalConfirmed`
-- `BullExitReversalConfirmed` / `BearExitReversalConfirmed`
-
-Divergence affects the signal label only — the numeric contribution remains unchanged (pilot stage).
+**Divergence-confirmed variants** (price-CRSI divergence alongside Fatigue or Exit):
+`BullFatigueReversalConfirmed`, `BearFatigueReversalConfirmed`, `BullExitReversalConfirmed`,
+`BearExitReversalConfirmed`. Divergence affects the label only; the numeric contribution is unchanged.
 
 > **See also:** `crsi-signals.md` explains how the API derives `crsiScore` and `crsiSignal` from the CRSI bands.
-
-### Metadata Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `symbol` | string | Symbol identifier (score endpoint only) |
-| `analysisDate` | string | Date of last price bar (yyyy-MM-dd, score endpoint only) |
-| `barsAnalyzed` | int | Total price bars used in the analysis |
-| `reasoning` | string | Human-readable step-by-step breakdown of how the score was derived |
-
-### Additional Properties (calculate endpoint only)
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `hasBearishDivergence` | bool | Price-CRSI bearish divergence detected near last bar. |
-| `hasBullishDivergence` | bool | Price-CRSI bullish divergence detected near last bar. |
-| `toppingCycles` | array | Individual cycle contributions in topping phase. |
-| `bottomingCycles` | array | Individual cycle contributions in bottoming phase. |
-| `fallingCycles` | array | Individual cycle contributions in falling phase. |
-| `risingCycles` | array | Individual cycle contributions in rising phase. |
-
-Each cycle contribution contains: `cycleLength`, `phaseScore` (-2=topping, -1=falling, +1=rising, +2=bottoming), `strength`, `stabilityScore` (0–1), `rank` (dominant peak rank, 0=unranked), `cycleQuality` (composite weight), `contribution` (weighted value added to consensus), `reason` (human-readable explanation).
 
 ### Score Composition Formula
 
@@ -123,9 +111,27 @@ CrsiContrib = (crsiScore / 3) × 20
 FinalScore  = CycleScore + CrsiContrib, clamped to ±100
 ```
 
-- Cycles alone max out at **±80** — full conviction requires CRSI agreement
-- CRSI alone can add at most **±20** — it cannot overpower or flip the cycle signal
-- The `reasoning` field shows each step of this calculation
+- Cycles alone max out at **±80**; full conviction needs CRSI agreement.
+- CRSI adds at most **±20**. It can only change the sign when the cycle score itself is within ±20.
+- `combinedScoreReasoning` shows each step.
+
+### PRO features inside the consensus
+
+As of September 2026 the consensus runs stability scoring and dominant peak detection for every
+caller, so `stabilityScore` and `rank` in the phase arrays can be filled even without the PRO level
+(unlike CycleScanner). This may change; if they come back as 0, rank by `strength` and `contribution`.
+
+### App UI parity (Cycle Scanner gauge)
+
+The Cycle Consensus gauge in the Cycle Scanner app runs the **same pipeline with CRSI integration
+enabled** (`includeCrsi=true`). The app has no setting to switch the CRSI term off; its `crsi=true`
+URL parameter only toggles the CRSI chart panel. The app falls back to the pure cycle consensus only
+when CRSI cannot be computed: fewer than about 50 bars, or a CRSI length above data length / 3
+(NaN bands).
+
+**If app gauge and API score differ,** the cause is almost always different scan inputs: the app uses
+the scanner's band, Bartels limit, detrending and window, while `calculate` uses the body's settings
+(defaults: Bartels 10, band 15–400) on exactly the values you send.
 
 ### App gauge vs. API score (verified 2026-08-24)
 
@@ -176,7 +182,8 @@ The `bullishConsensus` and `bearishConsensus` values carry independent informati
 
 ## Reading the Phase Breakdown
 
-The `toppingCycleCount`, `bottomingCycleCount`, `risingCycleCount`, and `fallingCycleCount` fields — together with the `bullishCycles` / `bearishCycles` length arrays (or the full cycle arrays in the `calculate` endpoint) — reveal **how imminent** the expected turn is:
+The four phase arrays (their lengths and the `cycleLength` values inside) reveal **how imminent** the
+expected turn is:
 
 - **Topping + Falling together** → Bearish with high conviction. Some cycles already turned, others following.
 - **Only Falling, no Topping** → Bearish building but inflection hasn't arrived yet.
