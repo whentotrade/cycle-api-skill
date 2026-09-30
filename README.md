@@ -1,6 +1,6 @@
 # Cycle Analysis API — Agent Skill
 
-A free skill that teaches AI agents how to use the [Cycle Analysis API](https://api.marketzeitgeist.com/specs/index.html?url=/apidocs/v1/swagger.json):
+A free skill that teaches AI agents how to use the [Cycle Analysis API](https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json):
 analysing your own time series: finding dominant cycles, scanning the cycle spectrum, applying DSP
 filters and CRSI, getting cycle consensus scores, storing datasets, and reading every result correctly.
 
@@ -31,17 +31,17 @@ Or for a team, in `.claude/settings.json`:
 
 ## You need an API key
 
-Create one on the API page of the app (app.marketzeitgeist.com; FSC members: app.cycles.org) and
+Create one on the API page of the app (app.cyclesiq.com; FSC members: app.cycles.org) and
 send it in the `X-API-Key` header. The free Guest tier covers every analysis route with your own
 data and 3 stored datasets. Or skip the key and use the MCP server below.
 
 ## MCP
 
-The same API is an MCP server at `https://api.marketzeitgeist.com/mcp`. It works without an account
+The same API is an MCP server at `https://api.cyclesiq.com/mcp`. It works without an account
 on a small free allowance; clients with OAuth then ask you to sign in. With a key:
 
 ```
-claude mcp add --transport http cycle-tools https://api.marketzeitgeist.com/mcp --header "X-API-Key: <key>"
+claude mcp add --transport http cycle-tools https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"
 ```
 
 ## What's inside

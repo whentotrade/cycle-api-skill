@@ -1,8 +1,8 @@
-# Cycle Analysis API — Endpoint Reference
+# Cycles IQ API — Endpoint Reference
 
-Base URL: `https://api.marketzeitgeist.com` · Auth: `X-API-Key: <key>` header on every call.
-Checked against the live Swagger document on 2026-09-25. For exact types the live schema is
-authoritative: https://api.marketzeitgeist.com/specs/index.html?url=/apidocs/v1/swagger.json
+Base URL: `https://api.cyclesiq.com` · Auth: `X-API-Key: <key>` header on every call (every call needs an account).
+Checked against the live Swagger document on 2026-09-30. For exact types the live schema is
+authoritative: https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json
 
 ## Contents
 
@@ -22,6 +22,7 @@ authoritative: https://api.marketzeitgeist.com/specs/index.html?url=/apidocs/v1/
 14. [Limits and usage](#14-limits-and-usage)
 15. [SubmitStreamData](#15-submitstreamdata-streaming-tiers)
 16. [Status codes](#16-status-codes)
+17. [SearchSymbols and market ids](#17-searchsymbols-and-market-ids)
 
 ---
 
@@ -348,16 +349,18 @@ Your own stored series, for use with `?datasetid=`.
 - `GET /api/datasets` answer (`DatasetList`): `tier`, `storedWithKey`, `maxDatasets`,
   `maxBarsPerDataset`, `datasets`. Each dataset (`DatasetInfo`): `name`, `type`, `storedWithKey`,
   `bars`, `firstBar`, `lastBar`, `lastUpdate`, `isPrivate`.
-- The quota (`maxDatasets`) counts datasets stored with a key. Guest: 3.
+- The quota (`maxDatasets`) counts datasets stored with a key: Free and FSC member 3, the trial and Pay as you go 50, Scale 500.
 
 ---
 
 ## 14. Limits and usage
 
-- **GET** `/api/me/limits` → your tier and, per endpoint group: `limits` (`perSecond`, `perMinute`,
-  `perHour`, `perDay`), `included` (false = the group is not in your tier), `needsFeature`, and your
-  calls `today` and this `month`. Totals: `totalToday`, `totalMonth`. The numbers lag live counters
-  by a few minutes.
+- **GET** `/api/me/limits` → `tier`, `plan` (7-day trial, Free, FSC member, Pay as you go, Scale),
+  `limits` (`perMinute`, `perDay`, `usedToday`, `allowance`, `allowanceCalls`, `allowanceUsed`,
+  `allowanceResetsAt`, `pro`, `datasets`, `barsPerDataset`, `streams`, `uploads`, `counting`), and per
+  endpoint group `included` (false = not in your plan: streams, uploads), `reason`, and your calls
+  `today` and this `month`. Totals: `totalToday`, `totalMonth`. `trial` says when a trial ends.
+  Every call counts once, whatever the route; the numbers lag live counters by about a minute.
 - **GET** `/api/me/usage?days=31` (max 92) → `usedThisMonth`, `quotaMonthly`, `byGroup`,
   `byChannel`, and `days` (`day`, `calls`, `byGroup`).
 
@@ -365,12 +368,12 @@ Call `/api/me/limits` once at the start of a session to see what the key can do.
 
 ---
 
-## 15. SubmitStreamData *(streaming tiers)*
+## 15. SubmitStreamData *(plans with streams)*
 
 **POST** `/api/Stream/SubmitStreamData`
 
-Pushes live bars into a stream dataset. Only for tiers and memberships with streaming; others get
-`403`. A stream is a dataset you keep appending to; analyse it with `?datasetid=<streamid>`.
+Pushes live bars into a stream dataset. Only for plans with streams (the trial 3, Pay as you go 50,
+Scale 100; FSC members by their membership); others get `403`. A stream is a dataset you keep appending to; analyse it with `?datasetid=<streamid>`.
 
 ```json
 {
@@ -387,8 +390,8 @@ Pushes live bars into a stream dataset. Only for tiers and memberships with stre
 - Dates `yyyy-MM-ddTHH:mm:ss`; `dates` and `values` of equal length.
 - Each allowed stream has 300 updates a day (one every five minutes). Over budget: `429` with the
   time to wait. Do not stream intra-bar ticks.
-- The number of streams depends on the tier or membership; a stream beyond it is refused.
-- Stream submissions never count toward the monthly cap.
+- The number of streams depends on the plan or membership; a stream beyond it is refused.
+- Stream submissions never count toward the plan's calls.
 
 For a one-off upload without live updates use `PUT /api/datasets/{name}` instead.
 
@@ -401,8 +404,23 @@ For a one-off upload without live updates use `PUT /api/datasets/{name}` instead
 | `200` / `201` | OK |
 | `202` | Documented for CycleScanner, CyclePowerScanner and PeakFinder; the body is a text message, read it |
 | `400` | Bad input; body is `ProblemDetails` (`title`, `status`, `detail`) |
-| `401` | No valid key |
-| `403` + message | Route or feature not in your tier; retrying does not help |
+| `401` | No valid key or sign-in |
+| `403` + message | Route or feature not in your plan; retrying does not help |
 | `404` | Dataset not found or empty window |
-| `429` + `Retry-After` | Rate limit; wait and retry |
-| `429` + quota body | Monthly cap reached. JSON body with `message`, `quotaMonthly`, `usedThisMonth`, `upgradeUrl`; `Retry-After` = seconds until the 1st of next month |
+| `429` + `Retry-After` | A limit of the plan: the speed, the day, or the allowance of the month or the trial. JSON body with `message`, `tier`, `plan`, `limit`, `upgradeUrl`; `Retry-After` = seconds until the counter allows calls again |
+
+---
+
+## 17. SearchSymbols and market ids
+
+**GET** `/api/data/SearchSymbols?search=<ticker or name>&limit=20`
+
+Finds markets by ticker or name (stocks, ETFs, crypto, forex, economic series; index series are not
+offered). Each hit: `symbol`, `symbolId` (the market's id, ending in `:HID`), `shortName`, `exchange`,
+`currency`, `type`. Pass the `symbolId` as `?datasetid=` to a cycle analysis (CycleScanner,
+CycleExplorer, CyclePowerScanner, CRSI, the consensus calculation): the API brings the market up to
+date, analyses its last 1,250 days unless `maxbars` or `from` say otherwise, and names the window in the
+answer's `analysedWindow` (`datasetId`, `first`, `last`, `bars`, `symbol`, `name`). The price fields are
+left out of the answer; the raw bars are the feature `MarketDataAccess` (granted on request), as are
+market ids on the routes whose answer is the series itself (Detrend, SavGol, SincSmoother, RSDtest). Not
+available through the MCP server.

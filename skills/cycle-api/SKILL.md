@@ -1,9 +1,10 @@
 ---
 name: cycle-api
 description: >
-  How to use the Cycle Analysis API (api.marketzeitgeist.com) from an AI agent or code, and
+  How to use the Cycles IQ API (api.cyclesiq.com, cycle analysis) from an AI agent or code, and
   how to read every result. The API analyses the caller's own time series: send the values
-  with each call or store them once as a dataset and name it with ?datasetid=. Covers cycle
+  with each call or store them once as a dataset and name it with ?datasetid=; markets found
+  with the symbol search can be analysed by id (the answer carries the cycles, not the prices). Covers cycle
   scanning (CycleScanner), the dominant cycle with forward projection (CycleExplorer), DSP
   filters (detrend, Savitzky-Golay, sinc smoothing, CRSI), trend turning points (RSD t-test),
   cycle-length clustering (KDE), the Cycle Consensus score, stored datasets, and limits/usage.
@@ -17,18 +18,21 @@ description: >
   "store my series", or any request involving the Cycle Analysis API.
 ---
 
-# Cycle Analysis API
+# Cycles IQ API (cycle analysis)
 
-Base URL: `https://api.marketzeitgeist.com`
+Base URL: `https://api.cyclesiq.com` (the older `api.marketzeitgeist.com` still answers)
 Auth: your key in the `X-API-Key` header on every request (`Authorization: Bearer <key>` works too;
-`?api_key=` in the query also works but ends up in logs)
-Key: create one on the API page of the app (app.marketzeitgeist.com; FSC members: app.cycles.org).
-The full key is shown once.
+`?api_key=` in the query also works but ends up in logs). Every call needs an account: there is no
+access without one.
+Key: sign up free at app.cyclesiq.com (a new account starts with a 7-day trial) and create the key on
+its API page (FSC members: app.cycles.org). The full key is shown once.
 Live schema (authoritative for types and fields):
-https://api.marketzeitgeist.com/specs/index.html?url=/apidocs/v1/swagger.json
+https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json
+Human documentation: https://marketzeitgeist.com/docs. Skill checked against the live API on 2026-09-30.
 
-The API analyses **your own data**. It does not look up market prices for you: you bring the
-values, either with every call or as a stored dataset.
+The API analyses **your own data**: you bring the values, with every call or as a stored dataset.
+It can also analyse a market you find with the symbol search, by its id (see **Market data by id**);
+such an answer carries the analysis and the analysed window, never the prices.
 
 | Reference | What's in it |
 |---|---|
@@ -71,48 +75,64 @@ analyses on the same series (scan, then CRSI, then consensus), or when the serie
 
 ---
 
-## Key levels and limits
+## Plans and limits
 
-Check `GET /api/me/limits` first: it shows your tier, the limits per endpoint group, which groups
-your key includes, and your calls today and this month. `GET /api/me/usage?days=31` gives the history.
+Every call with a key or a sign-in counts once on the account, whatever the route (REST, MCP, code);
+the keys and connectors of one account share the counter. Stream updates, the apps' own calls and
+`GET /api/me/*` are outside. Check `GET /api/me/limits` first: `plan`, `limits` (calls a minute, a day,
+the allowance of the month or the trial and what is used, when it resets, datasets, streams, PRO),
+and per endpoint group your calls today and this month.
 
-| | Guest (free) | Paid tiers |
-|---|---|---|
-| Analysis with body or `datasetid` | yes | yes |
-| Stored datasets | 3 (up to the bar size shown in `GET /api/datasets`) | more, larger |
-| Cycle Consensus (`calculate`) | yes, low limits | yes |
-| PRO features (`useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`) | no | with a PRO-level tier |
-| Live streaming (`SubmitStreamData`) | no | tiers and memberships with streaming |
-| Monthly cap | 2,000 key calls (streams never count) | by tier |
+| Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
+|---|---|---|---|---|---|---|---|
+| 7-day trial | every new account, 7 days from sign-up | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
+| Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
+| FSC member | FSC members, from the FSC page | 20 | 200 | 2,000 a month | no | 3 | by membership |
+| Pay as you go | booked on the API page | 300 | 20,000 (safety cap) | none, billed per call | yes | 50 | 50 |
+| Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
-Guest rate limits in September 2026 were 1 call per second for the `cycles` group; read the current
-numbers from `GET /api/me/limits` rather than hard-coding them.
+PRO features: `useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`. The raw bars of market
+data are part of no plan (the feature `MarketDataAccess`, granted on request). Read the current numbers
+from `GET /api/me/limits` rather than hard-coding them.
 
 **Answers you will see**
 
 | Status | Meaning | What to do |
 |---|---|---|
 | `400` | Bad input (too few values, body and `datasetid` together, bad name). Body is a `ProblemDetails` object | Fix the request |
-| `401` | No valid key | Check the header |
-| `403` with a message | The route or feature is not part of your tier | Retrying does not help; the message says what to do |
+| `401` | No valid key or sign-in | Check the header; sign up if you have no account |
+| `403` with a message | The route or feature is not part of your plan (raw bars, another user's dataset, streams) | Retrying does not help; the message says what to do |
 | `404` | `datasetid` names no dataset of yours, or the window is empty | Check `GET /api/datasets` |
-| `429` with `Retry-After` | Rate limit | Wait the given seconds, then retry |
-| `429` with a quota body (`quotaMonthly`, `usedThisMonth`) | Monthly cap reached; `Retry-After` counts to the 1st of next month | Stop; a long `Retry-After` means cap, not a burst |
+| `429` with `Retry-After` | A limit: the speed, the day, or the allowance of the month or the trial; the body names the plan, the limit and `upgradeUrl` | Wait the given seconds; a long `Retry-After` means the allowance, not a burst |
+
+---
+
+## Market data by id (REST only)
+
+`GET /api/data/SearchSymbols?search=apple` finds markets (stocks, ETFs, crypto, forex, economic
+series; no index series). Each hit's `symbolId` (ending in `:HID`) is the id: pass it as
+`?datasetid=<symbolId>` to a cycle analysis (CycleScanner, CycleExplorer, CyclePowerScanner, CRSI, the
+consensus calculation). The API analyses the market's last 1,250 days unless `maxbars` or `from` say
+otherwise, brings the data up to date first, and names what it analysed in `analysedWindow` (`first`,
+`last`, `bars`, `symbol`, `name`). The answer carries the cycles; the price fields are left out (the
+feature `MarketDataAccess` opens them). Smoothing, detrending and the RSD test take a market id only
+with that feature. The MCP server has no market data at all (below).
 
 ---
 
 ## Using it through MCP
 
-The same API is an MCP server: `https://api.marketzeitgeist.com/mcp` (Streamable HTTP). Its tools
-mirror the public routes (scanner, explorer, DSP, consensus, your datasets, limits), and a tool call
-is judged and counted like a direct call.
+The same API is an MCP server: `https://api.cyclesiq.com/mcp` (Streamable HTTP). Its 15 tools are the
+analyses of **your own data** (scanner, explorer, consensus, CRSI, DSP filters, RSD test, KDE, DTW
+clustering of your datasets, store/list/get your datasets, `my_limits`, `help`); a tool call is judged
+and counted like a direct call. The server provides no market data and has no symbol search: take the
+values from the user, a file or another connector and pass them as `datapoints`, or store them once
+with `store_dataset` and name them.
 
-- **No account needed to start.** Without a credential the tools run on a small free allowance per
-  address (own data only, sent with the call; no stored datasets, no consensus). When it is used up,
-  clients with OAuth (Claude.ai, Claude Desktop, Cursor, ChatGPT) are asked to sign in with a
-  MarketZeitgeist account; `…/mcp?account=1` asks at once.
-- **With a key:** send it as a header, e.g.
-  `claude mcp add --transport http cycle-tools https://api.marketzeitgeist.com/mcp --header "X-API-Key: <key>"`.
+- **Every call needs an account.** Clients with OAuth (Claude.ai, Claude Desktop, ChatGPT, Claude Code,
+  Cursor) are asked to sign in with a Cycles IQ account; signing up is free and starts the 7-day trial.
+- **With a key** instead of the sign-in:
+  `claude mcp add --transport http cycles-iq https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"`.
 - The `help` and `my_limits` tools say what the current credential allows.
 
 The rest of this skill applies unchanged: same parameters, same answers, same pitfalls.
@@ -138,8 +158,9 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 | GET | `/api/DSP/kde-auto-summary` | Same, with a summary per cluster |
 | GET · PUT · PATCH · DELETE | `/api/datasets`, `/api/datasets/{name}` | Your stored datasets |
 | POST | `/api/datasets/{name}/bars` | Append bars |
-| GET | `/api/me/limits` · `/api/me/usage` | Your limits and usage |
-| POST | `/api/Stream/SubmitStreamData` | Live data (streaming tiers only) |
+| GET | `/api/data/SearchSymbols` | Find a market; its `symbolId` is the id for `?datasetid=` |
+| GET | `/api/me/limits` · `/api/me/usage` | Your plan, limits and usage |
+| POST | `/api/Stream/SubmitStreamData` | Live data (plans with streams) |
 
 All analysis routes except `CycleSpectrumPeakFinder` and the three `kde` routes accept `datasetid`.
 Details, parameters and when to use each: `references/endpoints.md`.
@@ -150,7 +171,7 @@ Details, parameters and when to use each: `references/endpoints.md`.
 
 **What cycles are in this series?**
 `CycleScanner` → sort peaks by `strength` → drop `cycleLength < 30` → look for a clear strength gap
-between the leading peaks and the rest. With a PRO-level key add `useStability=true&dominantPeakFinder=true`
+between the leading peaks and the rest. In the trial, Pay as you go or Scale add `useStability=true&dominantPeakFinder=true`
 and prefer peaks with `dominantRank > 0` and `stabilityScore >= 0.5`.
 
 **Where is the dominant cycle and when does it turn?**
@@ -196,7 +217,7 @@ Store the series once (`PUT /api/datasets/NAME`) when you run more than one of t
   between groups matter more than absolute values.
 - `bartelsValue`: statistical significance (higher is more significant); `bartelsLimit` filters it.
 - `stabilityScore` (0–1) and `dominantRank` (1 = most dominant, 0 = unranked): **only computed with a
-  PRO-level key and `useStability` / `dominantPeakFinder` set**. Otherwise both are 0 and `license`
+  plan with the PRO features (the trial, Pay as you go, Scale) and `useStability` / `dominantPeakFinder` set**. Otherwise both are 0 and `license`
   says the step was skipped. Never filter on them in that case, or every cycle disappears.
 - Two phase groups, never mixed: average (`avgPhaseStatus`, `avgPhaseScore`, `minBarNum`) for scoring
   and regime; current (`phaseStatus`, `phaseScore`, `minBarNumCurrent`) for timing and projection.
@@ -279,7 +300,7 @@ from each. Full detail: `references/phase-guide.md`.
 
 | Pitfall | Fix |
 |---|---|
-| Filtering on `stabilityScore` or `dominantRank` without a PRO-level key discards every cycle | Both are 0 without PRO. Rank by `strength` and `bartelsValue` instead |
+| Filtering on `stabilityScore` or `dominantRank` without the PRO features discards every cycle | Both are 0 without PRO. Rank by `strength` and `bartelsValue` instead |
 | Treating `strength` as a percentage | It is a raw spectral weight; compare peaks relative to each other |
 | Mixing the average and current phase fields | Use `avgPhase*` + `minBarNum` together, or `phase*` + `minBarNumCurrent` together |
 | Reading direction from the phase score sign | Read the phase string (`Uptrend_Starting` = −95) |
@@ -287,8 +308,8 @@ from each. Full detail: `references/phase-guide.md`.
 | Results differ from the Cycle Scanner app | The app detrends with HP filter (`dType=0`) and uses its own band and window; send the same settings. `dType=9` (no detrending) gives very different strengths and ranks. `dType=4` (one-sided HP) avoids end-of-series bias when the latest bars matter |
 | Sending a bare array to `CycleConsensus/calculate` | It takes an object: `{"datapoints": [...], ...}` |
 | Body and `?datasetid=` in the same call | Refused with 400; send one or the other |
-| Retrying a `403` | It will not pass; the route or feature is outside your tier |
-| Bursts of calls get `429` | Honour `Retry-After`; wait between calls (Guest: about 1 per second on `cycles`) |
+| Retrying a `403` | It will not pass; the route or feature is outside your plan |
+| Bursts of calls get `429` | Honour `Retry-After`; Free allows 20 calls a minute, the trial and Pay as you go 300 |
 | A stored series gives a different result than last week | It grew. Pin the window with `from`/`to` or read `X-Dataset-First`/`X-Dataset-Last` |
 
 ---

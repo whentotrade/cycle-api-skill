@@ -1,6 +1,6 @@
 # Request Examples
 
-Base URL `https://api.marketzeitgeist.com`. Every example sends the key in the `X-API-Key` header.
+Base URL `https://api.cyclesiq.com`. Every example sends the key in the `X-API-Key` header.
 Values are closes, oldest first, at least 100.
 
 Contents: [curl](#curl) · [Python](#python) · [JavaScript](#javascript) · [C#](#c)
@@ -11,7 +11,7 @@ Contents: [curl](#curl) · [Python](#python) · [JavaScript](#javascript) · [C#
 
 ```bash
 KEY=YOUR_KEY
-API=https://api.marketzeitgeist.com
+API=https://api.cyclesiq.com
 
 # What can this key do?
 curl -H "X-API-Key: $KEY" $API/api/me/limits
@@ -51,7 +51,7 @@ curl -H "X-API-Key: $KEY" -X POST "$API/api/DSP/CRSI?datasetid=MYSERIES&length=3
 import time
 import requests
 
-API = "https://api.marketzeitgeist.com"
+API = "https://api.cyclesiq.com"
 S = requests.Session()
 S.headers["X-API-Key"] = "YOUR_KEY"
 
@@ -121,7 +121,7 @@ print(round(last, 1), state)
 ## JavaScript
 
 ```javascript
-const API = "https://api.marketzeitgeist.com";
+const API = "https://api.cyclesiq.com";
 const KEY = "YOUR_KEY";
 
 async function call(method, path, { params, body } = {}) {
@@ -182,7 +182,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-var http = new HttpClient { BaseAddress = new Uri("https://api.marketzeitgeist.com") };
+var http = new HttpClient { BaseAddress = new Uri("https://api.cyclesiq.com") };
 http.DefaultRequestHeaders.Add("X-API-Key", "YOUR_KEY");
 
 async Task<HttpResponseMessage> Send(Func<HttpRequestMessage> make)
