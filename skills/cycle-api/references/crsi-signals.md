@@ -60,4 +60,4 @@ When price-CRSI divergence is detected, Fatigue/Exit signals are upgraded to div
 
 ## How the signal enters the consensus score
 
-CRSI contributes `(crsiScore / 3) × 20`, so at most ±20 of the ±100 combined score. It confirms or dampens the cycle reading. It can only change the sign when the cycle score itself is within ±20. See `consensus-guide.md` § *Score Composition Formula*.
+CRSI contributes `−(crsiScore / 3) × 20`, so at most ±20 of the ±100 combined score, with the opposite sign of `crsiScore`: the overbought signals (+1 to +3) lower the score, the oversold signals (−1 to −3) raise it. It confirms or dampens the cycle reading. It can only change the sign when the cycle score itself is within ±20. See `consensus-guide.md` § *Score Composition Formula*.

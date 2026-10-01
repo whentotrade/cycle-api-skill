@@ -241,13 +241,17 @@ projected top/low), `lasttop` / `lastlow` (bars back), `phasingScore`, `cyclePro
 
 ### `ConsensusResponse` — CycleConsensus/calculate
 
-`combinedScore` (−100…+100), `bullishConsensus` / `bearishConsensus` (0–100), `bullishCycleCount` /
-`bearishCycleCount`, `breadthFactor` (0–1, penalises consensus carried by few cycles), `crsiScore`
-(−3…+3), `crsiSignal`, `crsiLength`, `crsiSourceCycleLength`, `hasBullishDivergence` /
-`hasBearishDivergence`, `combinedScoreReasoning` (step-by-step text), and four arrays of per-cycle
-contributions: `toppingCycles`, `bottomingCycles`, `risingCycles`, `fallingCycles`.
+`combinedScore` (−100…+100, positive = bullish), `bullishConsensus` / `bearishConsensus` (the weighted
+vote of each side: raw sums, not percentages), `bullishCycleCount` / `bearishCycleCount`,
+`breadthFactor` (0–1, information only), `crsiScore` (−3…+3), `crsiSignal`, `crsiLength`,
+`crsiSourceCycleLength`, `hasBullishDivergence` / `hasBearishDivergence`, `combinedScoreReasoning`
+(step-by-step text, every number in the sign of the score), and four arrays of per-cycle contributions:
+`toppingCycles`, `bottomingCycles`, `risingCycles`, `fallingCycles`. The arrays follow each cycle's
+**average** phase; every entry reports both phases (`avgPhaseScore` / `avgPhaseStatus` and
+`currentPhaseScore` / `currentPhaseStatus`), and the current one can already be one array further.
 
-Score composition: cycles contribute up to ±80, CRSI up to ±20 (`(crsiScore / 3) × 20`).
+Score composition: cycles contribute up to ±80, CRSI up to ±20 with the opposite sign of `crsiScore`
+(`−(crsiScore / 3) × 20`: overbought states lower the score, oversold states raise it).
 
 ### `Crsi_indicator` — CRSI
 
