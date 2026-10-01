@@ -48,12 +48,12 @@ consensus → CRSI.
 
 ### The four phase arrays
 
-| Property | Cycles that are … | Imminence |
-|----------|-------------------|-----------|
-| `toppingCycles` | at or near their peak, turning down | **At the turn**: the reversal is happening now |
-| `bottomingCycles` | at or near their trough, turning up | **At the turn**: the reversal is happening now |
-| `fallingCycles` | declining from peak toward trough | **Approaching**: bearish pressure building |
-| `risingCycles` | ascending from trough toward peak | **Approaching**: bullish pressure building |
+| Property | Cycles that are … | Where they stand |
+|----------|-------------------|------------------|
+| `toppingCycles` | within one eighth of their length of the peak, before or after it | **At the turn**: the reversal is happening now |
+| `bottomingCycles` | within one eighth of their length of the trough, before or after it | **At the turn**: the reversal is happening now |
+| `fallingCycles` | past the peak, in the middle of the decline | **Past the turn**: the downward pressure is on |
+| `risingCycles` | past the trough, in the middle of the rise | **Past the turn**: the upward pressure is on |
 
 **The arrays follow the average phase.** A cycle is topping with an average phase score of +80 and above
 (`Uptrend_ApproachingTop`, `TOP_Arrival`, `TOP_Departure`, `Downtrend_Starting`: the late rise, the peak and the early
@@ -209,12 +209,12 @@ The `bullishConsensus` and `bearishConsensus` values carry independent informati
 
 ## Reading the Phase Breakdown
 
-The four phase arrays (their lengths and the `cycleLength` values inside) reveal **how imminent** the
-expected turn is:
+The four phase arrays (their lengths and the `cycleLength` values inside) reveal **where the cycles stand
+relative to their turn**:
 
-- **Topping + Falling together** → Bearish with high conviction. Some cycles already turned, others following.
-- **Only Falling, no Topping** → Bearish building but inflection hasn't arrived yet.
-- **Only Topping, no Falling** → Turn happening now at longer cycles, shorter haven't confirmed.
+- **Topping + Falling together** → Bearish with high conviction. Some cycles are turning down now, others have already turned and are falling.
+- **Only Falling, no Topping** → The cycles have already turned: their peaks are behind them and the decline is under way. The reading confirms downward pressure; it does not announce a top that is still ahead.
+- **Only Topping, no Falling** → The turn is happening now: the cycles are at their peaks and none has moved into its decline yet.
 - Same logic applies symmetrically to the bullish side (Bottoming + Rising).
 
 ---
