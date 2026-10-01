@@ -1,6 +1,6 @@
-# Cycle Analysis API — Agent Skill
+# Cycles IQ API — Agent Skill
 
-A free skill that teaches AI agents how to use the [Cycle Analysis API](https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json):
+A free skill that teaches AI agents how to use the [Cycles IQ API](https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json):
 analysing your own time series: finding dominant cycles, scanning the cycle spectrum, applying DSP
 filters and CRSI, getting cycle consensus scores, storing datasets, and reading every result correctly.
 
@@ -29,19 +29,21 @@ Or for a team, in `.claude/settings.json`:
 }
 ```
 
-## You need an API key
+## You need an account and a key
 
-Create one on the API page of the app (app.cyclesiq.com; FSC members: app.cycles.org) and
-send it in the `X-API-Key` header. The free Guest tier covers every analysis route with your own
-data and 3 stored datasets. Or skip the key and use the MCP server below.
+Every call needs a Cycles IQ account. Sign up free at app.cyclesiq.com: a new account starts with a
+7-day trial and then continues on the Free plan, which covers every analysis route with your own data
+and 3 stored datasets. Confirm your e-mail address, create a key on the API page of the app (FSC
+members: app.cycles.org) and send it in the `X-API-Key` header.
 
 ## MCP
 
-The same API is an MCP server at `https://api.cyclesiq.com/mcp`. It works without an account
-on a small free allowance; clients with OAuth then ask you to sign in. With a key:
+The same analyses are an MCP server at `https://api.cyclesiq.com/mcp`, for your own data. Add it as a
+connector in Claude or ChatGPT and sign in with your Cycles IQ account (you can sign up right there),
+or connect with a key:
 
 ```
-claude mcp add --transport http cycle-tools https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"
+claude mcp add --transport http cycles-iq https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"
 ```
 
 ## What's inside

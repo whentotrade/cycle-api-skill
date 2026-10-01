@@ -15,7 +15,7 @@ description: >
   dominant cycle", "scan cycles", "detrend this data", "apply CRSI", "detect turning points",
   "smooth this series", "what cycles exist in", "cycle spectrum", "consensus score",
   "bullish or bearish consensus", "cycle consensus", "CRSI signal", "cycle phase",
-  "store my series", or any request involving the Cycle Analysis API.
+  "store my series", or any request involving the Cycles IQ API.
 ---
 
 # Cycles IQ API (cycle analysis)
@@ -24,8 +24,8 @@ Base URL: `https://api.cyclesiq.com` (the older `api.marketzeitgeist.com` still 
 Auth: your key in the `X-API-Key` header on every request (`Authorization: Bearer <key>` works too;
 `?api_key=` in the query also works but ends up in logs). Every call needs an account: there is no
 access without one.
-Key: sign up free at app.cyclesiq.com (a new account starts with a 7-day trial) and create the key on
-its API page (FSC members: app.cycles.org). The full key is shown once.
+Key: sign up free at app.cyclesiq.com (a new account starts with a 7-day trial), confirm your e-mail
+address and create the key on its API page (FSC members: app.cycles.org). The full key is shown once.
 Live schema (authoritative for types and fields):
 https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json
 Human documentation: https://marketzeitgeist.com/docs. Skill checked against the live API on 2026-09-30.
@@ -88,7 +88,7 @@ and per endpoint group your calls today and this month.
 | 7-day trial | every new account, 7 days from sign-up | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
 | FSC member | FSC members, from the FSC page | 20 | 200 | 2,000 a month | no | 3 | by membership |
-| Pay as you go | booked on the API page | 300 | 20,000 (safety cap) | none, billed per call | yes | 50 | 50 |
+| Pay as you go | on request until self-service booking opens | 300 | 20,000 (safety cap) | none, billed per token | yes | 50 | 50 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
 PRO features: `useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`. The raw bars of market
