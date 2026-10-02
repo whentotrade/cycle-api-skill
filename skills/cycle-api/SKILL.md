@@ -24,7 +24,7 @@ Base URL: `https://api.cyclesiq.com` (the older `api.marketzeitgeist.com` still 
 Auth: your key in the `X-API-Key` header on every request (`Authorization: Bearer <key>` works too;
 `?api_key=` in the query also works but ends up in logs). Every call needs an account: there is no
 access without one.
-Key: sign up free at app.cyclesiq.com (a new account starts with a 7-day trial), confirm your e-mail
+Key: sign up free at app.cyclesiq.com (a new account starts with a 30-day trial), confirm your e-mail
 address and create the key on its API page (FSC members: app.cycles.org). The full key is shown once.
 Live schema (authoritative for types and fields):
 https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger.json
@@ -85,7 +85,7 @@ and per endpoint group your calls today and this month.
 
 | Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
 |---|---|---|---|---|---|---|---|
-| 7-day trial | every new account, 7 days from sign-up | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
+| 30-day trial | every new account, 30 days from sign-up | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
 | FSC member | FSC members, from the FSC page | 20 | 200 | 2,000 a month | no | 3 | by membership |
 | Pay as you go | on request until self-service booking opens | 300 | 20,000 (safety cap) | none, billed per token | yes | 50 | 50 |
@@ -130,7 +130,7 @@ values from the user, a file or another connector and pass them as `datapoints`,
 with `store_dataset` and name them.
 
 - **Every call needs an account.** Clients with OAuth (Claude.ai, Claude Desktop, ChatGPT, Claude Code,
-  Cursor) are asked to sign in with a Cycles IQ account; signing up is free and starts the 7-day trial.
+  Cursor) are asked to sign in with a Cycles IQ account; signing up is free and starts the 30-day trial.
 - **With a key** instead of the sign-in:
   `claude mcp add --transport http cycles-iq https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"`.
 - The `help` and `my_limits` tools say what the current credential allows.

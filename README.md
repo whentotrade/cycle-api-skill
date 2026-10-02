@@ -32,7 +32,7 @@ Or for a team, in `.claude/settings.json`:
 ## You need an account and a key
 
 Every call needs a Cycles IQ account. Sign up free at app.cyclesiq.com: a new account starts with a
-7-day trial and then continues on the Free plan, which covers every analysis route with your own data
+30-day trial and then continues on the Free plan, which covers every analysis route with your own data
 and 3 stored datasets. Confirm your e-mail address, create a key on the API page of the app (FSC
 members: app.cycles.org) and send it in the `X-API-Key` header.
 

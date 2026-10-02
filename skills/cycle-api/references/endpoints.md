@@ -356,7 +356,7 @@ Your own stored series, for use with `?datasetid=`.
 
 ## 14. Limits and usage
 
-- **GET** `/api/me/limits` → `tier`, `plan` (7-day trial, Free, FSC member, Pay as you go, Scale),
+- **GET** `/api/me/limits` → `tier`, `plan` (30-day trial, Free, FSC member, Pay as you go, Scale),
   `limits` (`perMinute`, `perDay`, `usedToday`, `allowance`, `allowanceCalls`, `allowanceUsed`,
   `allowanceResetsAt`, `pro`, `datasets`, `barsPerDataset`, `streams`, `uploads`, `counting`), and per
   endpoint group `included` (false = not in your plan: streams, uploads), `reason`, and your calls
