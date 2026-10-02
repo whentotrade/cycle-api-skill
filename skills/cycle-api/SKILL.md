@@ -47,8 +47,8 @@ such an answer carries the analysis and the analysed window, never the prices.
 ## Two ways to supply data
 
 **1. In the body.** Every analysis route takes the values in the request body: a plain JSON array of
-numbers, oldest first, at least 100 values. (Exceptions: `CycleConsensus/calculate` and `DSP/kde` take
-an object, see below.)
+numbers, oldest first: at least 101 values for the cycle analyses, 11 for the DSP filters and the CRSI
+(see Constraints). (Exceptions: `CycleConsensus/calculate` and `DSP/kde` take an object, see below.)
 
 **2. As a stored dataset, named with `?datasetid=`.** Store the series once, then leave the body out
 and name it:
@@ -292,7 +292,10 @@ from each. Full detail: `references/phase-guide.md`.
 
 ## Constraints
 
-- At least **100 values** for every analysis route.
+- At least **101 values** for the cycle analyses (CycleScanner, CycleExplorer, CyclePowerScanner,
+  CycleComposite, CycleConsensus/calculate): 100 values or fewer are refused. At least **11** for the DSP
+  filters (Detrend, SavGol, SincSmoother) and the CRSI. RSDtest: more than twice its `window` (101 with
+  the default window of 50).
 - Cycle length windows: CycleScanner 5–400 (default 5–400); CycleExplorer 20–400 (default 30–290);
   consensus 15–400 by default.
 - Bartels limit 0–99: default 49 for CycleScanner and CycleExplorer, 10 for consensus. Lower

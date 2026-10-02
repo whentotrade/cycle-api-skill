@@ -1,7 +1,7 @@
 # Request Examples
 
 Base URL `https://api.cyclesiq.com`. Every example sends the key in the `X-API-Key` header.
-Values are closes, oldest first, at least 100.
+Values are closes, oldest first: at least 101 for the cycle analyses, 11 for the DSP filters and the CRSI.
 
 Contents: [curl](#curl) · [Python](#python) · [JavaScript](#javascript) · [C#](#c)
 
@@ -145,7 +145,7 @@ async function call(method, path, { params, body } = {}) {
   throw new Error("Still rate limited after 5 attempts");
 }
 
-const closes = [/* oldest first, at least 100 */];
+const closes = [/* oldest first, at least 101 */];
 const dates = [/* Unix seconds */];
 
 // 1. Scan with the values in the body
@@ -204,7 +204,7 @@ async Task<HttpResponseMessage> Send(Func<HttpRequestMessage> make)
     throw new InvalidOperationException("Still rate limited after 5 attempts");
 }
 
-double[] closes = /* oldest first, at least 100 */ [];
+double[] closes = /* oldest first, at least 101 */ [];
 long[] dates = /* Unix seconds */ [];
 
 // 1. Scan with the values in the body

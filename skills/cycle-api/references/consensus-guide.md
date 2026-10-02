@@ -23,7 +23,7 @@ The body is an **object**, not a bare array:
 }
 ```
 
-All fields except `datapoints` are optional (the values shown are the defaults). At least 100 closes,
+All fields except `datapoints` are optional (the values shown are the defaults). At least 101 closes,
 oldest first. With a stored dataset, leave `datapoints` out and add `?datasetid=NAME` (plus `maxbars`,
 `from`, `to` for the window); settings like `includeCrsi` can still go in the body.
 

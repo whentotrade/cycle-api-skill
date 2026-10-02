@@ -30,7 +30,8 @@ authoritative: https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger
 
 Every route in sections 2, 3 and 5–11 takes its series in one of two ways:
 
-- **Body:** a JSON array of numbers, oldest first, at least 100 values
+- **Body:** a JSON array of numbers, oldest first: at least 101 values for sections 2, 3, 5 and 11, at
+  least 11 for sections 6 to 9, more than twice the `window` for section 10 (101 with the default)
   (`CycleConsensus/calculate`: an object with `datapoints`, see section 5).
 - **`?datasetid=NAME`:** the name of one of your own datasets (stored with `PUT /api/datasets/{name}`,
   uploaded in the app, or one of your streams). Leave the body out.
@@ -184,7 +185,7 @@ Body (`ConsensusRequest`), **an object, not a bare array**:
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `datapoints` | number[] | — | Closes, oldest first, at least 100. Leave out when you use `?datasetid=` |
+| `datapoints` | number[] | — | Closes, oldest first, at least 101 (the consensus scans with CycleScanner, which refuses 100). Leave out when you use `?datasetid=` |
 | `bartelsLimit` | int | `10` | Minimum Bartels score |
 | `minCycleLength` | int | `15` | Shortest cycle |
 | `maxCycleLength` | int | `400` | Longest cycle (max 400) |
