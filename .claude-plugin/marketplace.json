@@ -8,7 +8,7 @@
       "name": "cycle-api",
       "source": "./skills/cycle-api",
       "description": "Use the Cycles IQ API (api.cyclesiq.com) with your own data: scan the cycle spectrum, find the dominant cycle, apply DSP filters and CRSI, get the Cycle Consensus score, store datasets for analysis by name, and read every result correctly. Also usable as an MCP server.",
-      "version": "1.0.5"
+      "version": "1.0.6"
     }
   ]
 }

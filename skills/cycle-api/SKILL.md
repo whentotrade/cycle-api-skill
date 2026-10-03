@@ -87,7 +87,7 @@ and per endpoint group your calls today and this month.
 |---|---|---|---|---|---|---|---|
 | 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls are used, whichever comes first | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
-| FSC member | FSC members, from the FSC page | 20 | 200 | 2,000 a month | no | 3 | by membership |
+| FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | no | 3 | by membership |
 | Pay as you go | on request until self-service booking opens | 300 | 20,000 (safety cap) | none, billed per token | yes | 50 | 50 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
