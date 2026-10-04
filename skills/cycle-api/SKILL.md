@@ -135,6 +135,14 @@ with `store_dataset` and name them.
   `claude mcp add --transport http cycles-iq https://api.cyclesiq.com/mcp --header "X-API-Key: <key>"`.
 - The `help` and `my_limits` tools say what the current credential allows.
 
+**MCP or a script?** Through MCP every value and every answer passes through the conversation: right for a
+look at one series. For many series, long histories or repeated runs, a script that calls the REST routes
+costs far less, because the numbers never enter the conversation. Where you can run code, offer the user
+this route; the choice is theirs. The user creates a key on the app's API page and keeps it in an
+environment variable (for example `CYCLESIQ_API_KEY`) or a local file the script reads and version
+control ignores; the script sends it as `X-API-Key`. Never ask for the key in the chat: conversations
+are stored. Same account, same limits: every call counts once, by either route.
+
 The rest of this skill applies unchanged: same parameters, same answers, same pitfalls.
 
 ---
