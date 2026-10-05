@@ -364,8 +364,8 @@ Your own stored series, for use with `?datasetid=`.
   Every call counts once, whatever the route; the numbers lag live counters by about a minute.
   Tokens, the value of the calls: `tokensToday`, `tokensMonth`, `tokensMonthByChannel` (`app`, `key`,
   `mcp`, ...), per group `tokensToday` and `tokensMonth`, and `tokenRule` (what a token is). Every
-  successful answer names its own tokens in the header `X-CyclesIQ-Tokens`. The plan limits calls,
-  not tokens.
+  successful answer outside `/api/me/*` names its own tokens in the header `X-CyclesIQ-Tokens`. The
+  plan limits calls, not tokens.
 - **GET** `/api/me/usage?days=31` (max 92) → `usedThisMonth`, `quotaMonthly`, `byGroup`,
   `byChannel`, and `days` (`day`, `calls`, `byGroup`).
 
