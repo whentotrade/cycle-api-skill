@@ -83,6 +83,11 @@ the keys and connectors of one account share the counter. Stream updates, the ap
 the allowance of the month or the trial and what is used, when it resets, datasets, streams, PRO),
 and per endpoint group your calls today and this month.
 
+Every successful answer names the call's value in tokens in the header `X-CyclesIQ-Tokens`: the rating
+of its route plus one token for every 500 data points it works on. `GET /api/me/limits` adds them up
+(`tokensToday`, `tokensMonth`, `tokensMonthByChannel`). The plan limits calls; the tokens are
+information today (Pay as you go will be billed by them).
+
 | Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
 |---|---|---|---|---|---|---|---|
 | 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls are used, whichever comes first | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
