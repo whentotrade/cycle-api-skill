@@ -84,9 +84,10 @@ the allowance of the month or the trial and what is used, when it resets, datase
 and per endpoint group your calls today and this month.
 
 Every successful answer outside `/api/me/*` names the call's value in tokens in the header
-`X-CyclesIQ-Tokens`: the rating of its route plus one token for every 500 data points it works on or
-part of them. `GET /api/me/limits` adds them up (`tokensToday`, `tokensMonth`, `tokensMonthByChannel`).
-The plan limits calls; the tokens are information today (Pay as you go will be billed by them).
+`X-CyclesIQ-Tokens`: the rating of its route plus one token for every 1,000 data points it works on or
+part of them; a stream update is one token. `GET /api/me/limits` adds them up (`tokensToday`, `tokensMonth`,
+`tokensMonthByChannel`). The plan limits calls; the tokens are information today (Pay as you go will be
+billed by the tokens of calls by API key and MCP, stream updates included; never the app's own calls).
 
 | Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
 |---|---|---|---|---|---|---|---|
