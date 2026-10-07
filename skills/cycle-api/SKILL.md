@@ -86,15 +86,22 @@ and per endpoint group your calls today and this month.
 Every successful answer outside `/api/me/*` names the call's value in tokens in the header
 `X-CyclesIQ-Tokens`: the rating of its route plus one token for every 1,000 data points it works on or
 part of them; ten stream updates are one token. `GET /api/me/limits` adds them up (`tokensToday`, `tokensMonth`,
-`tokensMonthByChannel`). The plan limits calls; the tokens are information today (Pay as you go will be
-billed by the tokens of calls by API key and MCP, stream updates included; never the app's own calls).
+`tokensMonthByChannel`). The plan limits calls; the tokens are the value of the usage: Pay as you go is
+billed by the tokens of calls by API key and MCP, stream updates included (never the app's own calls), at
+1.75 EUR per 1,000 tokens plus VAT where it applies. A Pay as you go account has a monthly spending limit it
+sets itself on the API page of the app (50 EUR a month unless changed): at 100 % every call by key or MCP,
+stream updates included, is refused with `429` and "Your spending limit for this month is reached. Raise it
+on the API page, or wait until the 1st." (`Retry-After` = seconds to the 1st; a refused call costs nothing);
+from 80 % every answer carries `X-CyclesIQ-Spending: 82% of 50 EUR`. `GET /api/me/limits` and `my_limits`
+show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `percent`, `notice`,
+`reached`, `resetsAt`); on every other plan `spending` is null.
 
 | Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
 |---|---|---|---|---|---|---|---|
 | 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls are used, whichever comes first | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
 | FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | no | 3 | by membership |
-| Pay as you go | on request until self-service booking opens | 300 | 20,000 (safety cap) | none, billed per token | yes | 50 | 50 |
+| Pay as you go | a Cycles IQ account; booked on the API page of the app once self-service opens | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
 PRO features: `useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`. The raw bars of market
@@ -331,6 +338,7 @@ from each. Full detail: `references/phase-guide.md`.
 | Body and `?datasetid=` in the same call | Refused with 400; send one or the other |
 | Retrying a `403` | It will not pass; the route or feature is outside your plan |
 | Bursts of calls get `429` | Honour `Retry-After`; Free allows 20 calls a minute, the trial and Pay as you go 300 |
+| `429` with "Your spending limit for this month is reached" | Pay as you go only: the account's own monthly limit is used up. Raise it on the API page of the app, or wait until the 1st (`Retry-After`); `my_limits` shows `spending` |
 | A stored series gives a different result than last week | It grew. Pin the window with `from`/`to` or read `X-Dataset-First`/`X-Dataset-Last` |
 
 ---

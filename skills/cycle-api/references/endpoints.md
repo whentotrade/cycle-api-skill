@@ -363,7 +363,9 @@ Your own stored series, for use with `?datasetid=`.
   `today` and this `month`. Totals: `totalToday`, `totalMonth`. `trial` says when a trial ends.
   Every call counts once, whatever the route; the numbers lag live counters by about a minute.
   Tokens, the value of the calls: `tokensToday`, `tokensMonth`, `tokensMonthByChannel` (`app`, `key`,
-  `mcp`, ...), per group `tokensToday` and `tokensMonth`, and `tokenRule` (what a token is). Every
+  `mcp`, ...), per group `tokensToday` and `tokensMonth`, and `tokenRule` (what a token is). On Pay as
+  you go `spending`: `limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `percent`, `notice` (from 80 %),
+  `reached`, `resetsAt`, `text`; null on other plans (the spending limit, set on the API page of the app). Every
   successful answer outside `/api/me/*` names its own tokens in the header `X-CyclesIQ-Tokens`. The
   plan limits calls, not tokens.
 - **GET** `/api/me/usage?days=31` (max 92) → `usedThisMonth`, `quotaMonthly`, `byGroup`,
