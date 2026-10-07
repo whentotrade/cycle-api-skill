@@ -86,7 +86,7 @@ for projection, CRSI tuning or a composite.
 | `bartelsLimit`, `range`, `sortedBy`, `cycleStart`, `cycleEnd`, `cycleResolution`, `usedAmplitudeMulti` | Settings used |
 | `spectrum` | Spectrum amplitudes (with `includeSpectrum=true`) |
 | `peaksString` | Short text summary of the peaks |
-| `statusCode` | `OK` or an error status |
+| `statusCode` | `OK` for a result. A failed analysis (too few values, no cycle) comes with HTTP 400 and the reason here |
 | `license` | Notes on skipped PRO steps, e.g. "Stability scoring skipped: PRO level required" |
 
 **`CycleData` (one peak)**
@@ -143,7 +143,7 @@ the next top or low?"
 | `phasingScore`, `cycleProfitability` | Quality scores of the detected cycle (higher is better) |
 | `barsused`, `barsAvailable`, `analysisStartDate`, `analysisEndDate`, `currentPrice` | Window and last value |
 | `timeSeries` | With `includeTimeseries=true`: `{ price, smoothedPrice, date, dateUnix, dominantCycle, cycleHighlighter }` per bar |
-| `statusCode`, `license` | Status and notes on skipped PRO steps |
+| `statusCode`, `license` | `OK` for a result, and notes on skipped PRO steps. A failed analysis comes with HTTP 400 and the reason in `statusCode`: 100 values or fewer, or no cycle between the lengths at the Bartels limit (widen the range or lower the limit). The same object, zeros elsewhere; a failed call costs no tokens |
 
 The answer also has `stabilityScore`, `bullishConsensus`, `bearishConsensus`, `combinedScore` and
 `usedDominantRank`; treat them as informational (they depend on PRO steps).
