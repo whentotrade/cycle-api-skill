@@ -142,11 +142,14 @@ Final: -25.4 + (0) = -25.4, display: -25
 Sign: positive = bullish, negative = bearish
 ```
 
-### PRO features inside the consensus
+### Stability and ranks inside the consensus
 
-As of September 2026 the consensus runs stability scoring and dominant peak detection for every
-caller, so `stabilityScore` and `rank` in the phase arrays can be filled even without the PRO level
-(unlike CycleScanner). This may change; if they come back as 0, rank by `strength` and `contribution`.
+The consensus route runs stability scoring and dominant peak detection for every caller, so `stabilityScore`
+and `rank` in the phase arrays are filled. Since 8 October 2026 CycleScanner scores the stability for every plan
+too (`useStability=true`); its `includeConsensus=true` option answers the consensus of exactly the cycles it
+returns, with their stability scores and, with `dominantPeakFinder` (PRO), their ranks: the same `ConsensusResponse`
+as this route, in the field `consensus` of the scan's answer. If `stabilityScore` or `rank` come back as 0, the
+option that fills them did not run: rank by `strength` and `contribution`.
 
 ### App UI parity (Cycle Scanner gauge)
 

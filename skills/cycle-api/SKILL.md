@@ -104,7 +104,8 @@ show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `p
 | Pay as you go | a Cycles IQ account; booked on the API page of the app once self-service opens | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
-PRO features: `useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`. The raw bars of market
+PRO features: `dominantPeakFinder`, `CycleSpectrumPeakFinder` (`useStability` is open to every plan since 8 October
+2026). The raw bars of market
 data are part of no plan (the feature `MarketDataAccess`, granted on request). Read the current numbers
 from `GET /api/me/limits` rather than hard-coding them.
 
@@ -164,11 +165,14 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/api/cycles/CycleScanner` | Full cycle spectrum: every significant cycle with length, strength, phase |
+| POST | `/api/cycles/CycleScanner` | Full cycle spectrum: every significant cycle with length, strength, phase; `includeConsensus=true` adds the consensus of exactly these cycles |
+| POST | `/api/cycles/CycleDetails` | One cycle on a series: its profitability, stability and highlighter for the phase you give |
 | POST | `/api/cycles/CycleExplorer` | The dominant cycle in a length window, projected forward |
 | POST | `/api/cycles/CycleSpectrumPeakFinder` | Rank the peaks of a spectrum you already have *(PRO)* |
 | POST | `/api/CycleConsensus/calculate` | Cycle Consensus score (−100…+100) with per-cycle contributions and CRSI |
 | POST | `/api/DSP/CRSI` | Cyclic Smoothed RSI with dynamic upper/lower bands |
+| POST | `/api/DSP/CycleSwing` | Cycle swing (CSI): the acceleration of the dominant cycle, one value per bar |
+| POST | `/api/DSP/TDSequential` | TD Sequential buy and sell setups per bar, counted to 9 or 13 |
 | POST | `/api/DSP/Detrend` | Remove the trend (HP, boosted HP, polynomial, spline, one-sided HP) |
 | POST | `/api/DSP/SavGol` | Savitzky-Golay smoothing |
 | POST | `/api/DSP/SincSmoother` | Modified sinc smoothing (MS / MS1) |
@@ -192,8 +196,10 @@ Details, parameters and when to use each: `references/endpoints.md`.
 
 **What cycles are in this series?**
 `CycleScanner` → sort peaks by `strength` → drop `cycleLength < 30` → look for a clear strength gap
-between the leading peaks and the rest. In the trial, Pay as you go or Scale add `useStability=true&dominantPeakFinder=true`
-and prefer peaks with `dominantRank > 0` and `stabilityScore >= 0.5`.
+between the leading peaks and the rest. Add `useStability=true` (every plan) and, in the trial, Pay as you go or Scale,
+`dominantPeakFinder=true`; prefer peaks with `stabilityScore >= 0.5` and, where ranked, `dominantRank > 0`. With
+`includeConsensus=true` the same answer carries the consensus of exactly these cycles (`consensus`, the answer of
+`CycleConsensus/calculate`), so one call gives the cycles and the verdict.
 
 **Where is the dominant cycle and when does it turn?**
 `CycleExplorer` with a length window (`minCycleLength`, `maxCycleLength`) and `plotForward` → read
@@ -237,9 +243,10 @@ Store the series once (`PUT /api/datasets/NAME`) when you run more than one of t
 - `strength`: a raw number (e.g. 2.8), **not a percentage**. Compare peaks with each other; gaps
   between groups matter more than absolute values.
 - `bartelsValue`: statistical significance (higher is more significant); `bartelsLimit` filters it.
-- `stabilityScore` (0–1) and `dominantRank` (1 = most dominant, 0 = unranked): **only computed with a
-  plan with the PRO features (the trial, Pay as you go, Scale) and `useStability` / `dominantPeakFinder` set**. Otherwise both are 0 and `license`
-  says the step was skipped. Never filter on them in that case, or every cycle disappears.
+- `stabilityScore` (0–1): **only computed with `useStability=true`** (every plan since 8 October 2026); otherwise 0.
+  `dominantRank` (1 = most dominant, 0 = unranked): **only with `dominantPeakFinder=true` and a plan with the PRO
+  features (the trial, Pay as you go, Scale)**; otherwise 0 and `license` says the step was skipped. Never filter on a
+  field that was not computed, or every cycle disappears.
 - Two phase groups, never mixed: average (`avgPhaseStatus`, `avgPhaseScore`, `minBarNum`) for scoring
   and regime; current (`phaseStatus`, `phaseScore`, `minBarNumCurrent`) for timing and projection.
   See **Phase strings and scores** below.
@@ -328,7 +335,7 @@ from each. Full detail: `references/phase-guide.md`.
 
 | Pitfall | Fix |
 |---|---|
-| Filtering on `stabilityScore` or `dominantRank` without the PRO features discards every cycle | Both are 0 without PRO. Rank by `strength` and `bartelsValue` instead |
+| Filtering on `stabilityScore` without `useStability`, or on `dominantRank` without `dominantPeakFinder` and the PRO features, discards every cycle | The field is 0 when its option did not run. Rank by `strength` and `bartelsValue` instead |
 | Treating `strength` as a percentage | It is a raw spectral weight; compare peaks relative to each other |
 | Mixing the average and current phase fields | Use `avgPhase*` + `minBarNum` together, or `phase*` + `minBarNumCurrent` together |
 | Reading direction from the phase score sign | Read the phase string (`Uptrend_Starting` = −95) |

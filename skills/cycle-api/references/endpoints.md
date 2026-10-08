@@ -23,6 +23,9 @@ authoritative: https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger
 15. [SubmitStreamData](#15-submitstreamdata-streaming-tiers)
 16. [Status codes](#16-status-codes)
 17. [SearchSymbols and market ids](#17-searchsymbols-and-market-ids)
+18. [CycleDetails](#18-cycledetails)
+19. [CycleSwing](#19-cycleswing)
+20. [TDSequential](#20-tdsequential)
 
 ---
 
@@ -72,10 +75,11 @@ for projection, CRSI tuning or a composite.
 | `sortByStrength` | bool | `true` | Sort peaks by strength (`false`: by amplitude) |
 | `cycleResolution` | number | `1.0` | Spectrum step: `1.0` or `0.1` |
 | `amplitudeMulti` | number | `1.0` | Multiplier for series with very small values (e.g. forex) |
-| `useStability` | bool | `false` | Stability score per cycle, 0–1 *(PRO-level key)* |
+| `useStability` | bool | `false` | Stability score per cycle, 0–1 (every plan since 8 October 2026) |
 | `dominantPeakFinder` | bool | `false` | Rank peaks by the shape of the spectrum *(PRO-level key)* |
 | `includeSpectrum` | bool | `false` | Return the full spectrum array |
 | `humanReadableText` | bool | `false` | Return plain text instead of JSON |
+| `includeConsensus` | bool | `false` | Add `consensus`: the Cycle Consensus (the answer of `CycleConsensus/calculate`) of exactly the cycles returned, their stability scores and ranks included. Ask for `useStability` too, or the consensus weighs stability scores of 0 (`license` says so). Not with `humanReadableText`. Rated 3 + 10 tokens |
 
 **Answer: `CycleScannerResults`**
 
@@ -87,7 +91,8 @@ for projection, CRSI tuning or a composite.
 | `spectrum` | Spectrum amplitudes (with `includeSpectrum=true`) |
 | `peaksString` | Short text summary of the peaks |
 | `statusCode` | `OK` for a result. A failed analysis (too few values, no cycle) comes with HTTP 400 and the reason here |
-| `license` | Notes on skipped PRO steps, e.g. "Stability scoring skipped: PRO level required" |
+| `license` | Notes on a skipped PRO step ("Dominant PeakFinder skipped: PRO level required …") or a consensus without stability scores |
+| `consensus` | With `includeConsensus=true`: the `ConsensusResponse` of these cycles (section 5); left out otherwise |
 
 **`CycleData` (one peak)**
 
@@ -98,7 +103,7 @@ for projection, CRSI tuning or a composite.
 | `strength` | Raw spectral weight, **not a percentage**. Compare peaks with each other |
 | `bartelsValue` | Statistical significance of the cycle (higher = more significant) |
 | `dominantRank` | 1 = most dominant, 0 = unranked. Needs `dominantPeakFinder` and a PRO-level key, otherwise 0 |
-| `stabilityScore` | 0–1, consistency of amplitude and phase over time. Needs `useStability` and a PRO-level key, otherwise 0 |
+| `stabilityScore` | 0–1, consistency of amplitude and phase over time. Needs `useStability` (every plan), otherwise 0 |
 | `avgPhaseStatus`, `avgPhaseScore`, `avgPhase`, `minBarNum` | Average phase group: phase fitted across all repetitions. `minBarNum` = bar index of a trough |
 | `phaseStatus`, `phaseScore`, `phase`, `minBarNumCurrent` | Current phase group: phase fitted to the recent bars only |
 | `cyclesBack`, `avgPhaseTotalBars` | How much history the phase fit used |
@@ -431,3 +436,75 @@ answer's `analysedWindow` (`datasetId`, `first`, `last`, `bars`, `symbol`, `name
 left out of the answer; the raw bars are the feature `MarketDataAccess` (granted on request), as are
 market ids on the routes whose answer is the series itself (Detrend, SavGol, SincSmoother, RSDtest). Not
 available through the MCP server.
+
+---
+## 18. CycleDetails
+
+**POST** `/api/cycles/CycleDetails?cycleLength=&amplitude=&phase=`
+
+The details of one cycle on a series, for the phase you give: its trading profitability (the share of profitable
+trades when its tops and lows, timed from the phase, are traded back through the series), its stability score (the
+correlation of its wave with the cycle highlighter over its last iterations) and the cycle highlighter itself (one
+value per bar, a band around zero). What the Cycle Scanner app shows in the details box of a cycle.
+
+**Use it when** you want to judge one cycle of a scan: how tradable it was, how stable it is, how it reads on the chart.
+
+| Param | Type | Default | Meaning |
+|---|---|---|---|
+| `cycleLength` | number | — | The peak's `cycleLength`, at least 5 |
+| `amplitude` | number | `1.0` | The peak's `amplitude`, positive (only its sign matters to the stability) |
+| `phase` | number | `0` | The peak's `phase` (current phase) or `avgPhase` (average phase), radians, −2π to 2π |
+
+Body: the series the cycle was scanned on (at least as many values as the cycle length, and at least 11; positive
+values for the profitability). `?datasetid=` names one of your stored datasets; a market dataset only with the feature
+`MarketDataAccess`, since the highlighter follows the series.
+
+Answer (`CycleDetails`): `cycleLength`, `amplitude`, `phase` as given; `profitability` (0–1; 0 for fewer than 50 values);
+`stabilityScore` (0–1; on `avgPhase` it equals the scanner's `stabilityScore`); `cycleHighlighter` (one value per bar).
+Refused with 400 and the reason: too few values, NaN or Infinity, a cycle length below 5, an amplitude that is not
+positive, a phase outside −2π to 2π, or no measure (a series flat over the cycle's last iterations, or values too
+large). Rated 3 tokens plus the data points.
+
+---
+
+## 19. CycleSwing
+
+**POST** `/api/DSP/CycleSwing`
+
+The cycle swing indicator (CSI): the acceleration of the dominant cycle, the difference of a fast and a slow cycle
+thrust over a rolling window of 50 bars, in the units of the series. The momentum overlay of the Cycle Scanner app's
+chart.
+
+**Use it when** you want the cycle momentum per bar next to the price.
+
+Body: the series, at least 50 values (the window). `?datasetid=` names one of your stored datasets; a market dataset
+only with the feature `MarketDataAccess` (the swing is a filter of the series in its own units).
+
+Answer (`CycleSwingIndicator`): `{ "window": 50, "cycleSwing": [null, …, values] }`, one entry per bar, `null` for the
+first 49 bars. Refused with 400 and the reason: fewer than 50 values, NaN or Infinity, values that overflow the
+indicator. Rated 2 tokens plus the data points.
+
+---
+
+## 20. TDSequential
+
+**POST** `/api/DSP/TDSequential?counting=9`
+
+The TD Sequential setups of a series: a bar extends the buy setup when its close is below the close four bars back,
+and the sell setup when it is above; a count resets to zero the moment its condition fails, and the bar after a
+completed setup starts at 1 again when its condition holds. The exhaustion-point markers of the Cycle Scanner app's
+chart.
+
+**Use it when** you want the exhaustion counts per bar (9 or 13).
+
+| Param | Type | Default | Meaning |
+|---|---|---|---|
+| `counting` | int | `9` | The count that completes a setup: 9 or 13 as a rule (2 to 100) |
+
+Body: the series, at least 11 values. `?datasetid=` names one of your stored datasets or a market dataset by its id
+(booleans and counts: an analysis, no feature needed).
+
+Answer (`SequentialSetupSeries`): `buySignals`, `sellSignals` (true on the bar a setup completed), `counts` (the running
+count per bar, negative while the sell setup leads, 0 where nothing counts), `lastCount` (the count on the last bar),
+`lastIndex` (its index). Refused with 400 and the reason: 10 values or fewer, NaN or Infinity, a counting outside 2
+to 100. Rated 2 tokens plus the data points.
