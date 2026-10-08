@@ -88,7 +88,9 @@ Every successful answer outside `/api/me/*` names the call's value in tokens in 
 part of them; ten stream updates are one token. `GET /api/me/limits` adds them up (`tokensToday`, `tokensMonth`,
 `tokensMonthByChannel`). The plan limits calls; the tokens are the value of the usage: Pay as you go is
 billed by the tokens of calls by API key and MCP, stream updates included (never the app's own calls), at
-1.75 EUR per 1,000 tokens plus VAT where it applies. A Pay as you go account has a monthly spending limit it
+1.75 EUR per 1,000 tokens plus VAT where it applies, billed monthly through Stripe with Link as the merchant of
+record (the invoice comes from Link; payment method, invoices and cancellation in Stripe's customer portal from the
+API page). A Pay as you go account has a monthly spending limit it
 sets itself on the API page of the app (50 EUR a month unless changed): at 100 % every call by key or MCP,
 stream updates included, is refused with `429` and "Your spending limit for this month is reached. Raise it
 on the API page, or wait until the 1st." (`Retry-After` = seconds to the 1st; a refused call costs nothing);
@@ -101,7 +103,7 @@ show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `p
 | 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls are used, whichever comes first | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
 | FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | no | 3 | by membership |
-| Pay as you go | a Cycles IQ account; booked on the API page of the app once self-service opens | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
+| Pay as you go | a Cycles IQ account; booked on the API page of the app (app.cyclesiq.com, Account > API) | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
 PRO features: `useStability`, `dominantPeakFinder`, `CycleSpectrumPeakFinder`. The raw bars of market
