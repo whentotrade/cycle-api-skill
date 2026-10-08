@@ -77,6 +77,7 @@ for projection, CRSI tuning or a composite.
 | `amplitudeMulti` | number | `1.0` | Multiplier for series with very small values (e.g. forex) |
 | `useStability` | bool | `false` | Stability score per cycle, 0–1 (every plan since 8 October 2026) |
 | `dominantPeakFinder` | bool | `false` | Rank peaks by the shape of the spectrum *(PRO-level key)* |
+| `dominantPeakFinderBartels` | int | `0` | With `dominantPeakFinder`: a rank only for a cycle whose `bartelsValue` reaches this (the Cycle Scanner app uses its setting, 10); 0 = every cycle the finder names |
 | `includeSpectrum` | bool | `false` | Return the full spectrum array |
 | `humanReadableText` | bool | `false` | Return plain text instead of JSON |
 | `includeConsensus` | bool | `false` | Add `consensus`: the Cycle Consensus (the answer of `CycleConsensus/calculate`) of exactly the cycles returned, their stability scores and ranks included. Ask for `useStability` too, or the consensus weighs stability scores of 0 (`license` says so). Not with `humanReadableText`. Rated 3 + 10 tokens |
