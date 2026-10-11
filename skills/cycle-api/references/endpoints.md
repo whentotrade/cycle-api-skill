@@ -383,7 +383,11 @@ Call `/api/me/limits` once at the start of a session to see what the key can do.
 
 ## 15. SubmitStreamData *(plans with streams)*
 
-**POST** `/api/Stream/SubmitStreamData`
+**POST** `https://streams.cyclesiq.com/api/Stream/SubmitStreamData`
+
+The stream route has its own host, `streams.cyclesiq.com`, since October 2026: point webhooks and feeders there. The
+other hosts of the API still accept pushes for now; their answers say where to send, and a host that no longer accepts
+the route answers `410` with the address.
 
 Pushes live bars into a stream dataset. Only for plans with streams (the trial 3, Pay as you go 50,
 Scale 100; FSC members by their membership); others get `403`. A stream is a dataset you keep appending to; analyse it with `?datasetid=<streamid>`.
@@ -404,6 +408,11 @@ Scale 100; FSC members by their membership); others get `403`. A stream is a dat
 - Each allowed stream has 300 updates a day (one every five minutes). Over budget: `429` with the
   time to wait. Do not stream intra-bar ticks.
 - The number of streams depends on the plan or membership; a stream beyond it is refused.
+- A push with no key, an unknown key or an expired licence answers `401` with a JSON body: `reason` (`no_key`,
+  `key_unknown`, `licence_expired`, `key_refused`, `token_invalid`), `message`, `licenceEnded` (date or null), `renew`
+  (the API page), `send` (the stream host's route), `docs`, and `notice` when the push went to another host than the
+  stream host. Webhooks ignore answers, so read your alert log: a licence that ended keeps the alert firing in vain
+  until you delete it or renew.
 - Stream submissions never count toward the plan's calls.
 
 For a one-off upload without live updates use `PUT /api/datasets/{name}` instead.

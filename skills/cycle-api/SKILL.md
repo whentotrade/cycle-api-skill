@@ -187,7 +187,7 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 | POST | `/api/datasets/{name}/bars` | Append bars |
 | GET | `/api/data/SearchSymbols` | Find a market; its `symbolId` is the id for `?datasetid=` |
 | GET | `/api/me/limits` · `/api/me/usage` | Your plan, limits and usage |
-| POST | `/api/Stream/SubmitStreamData` | Live data (plans with streams) |
+| POST | `/api/Stream/SubmitStreamData` | Live data (plans with streams); send to the stream host `https://streams.cyclesiq.com` |
 
 All analysis routes except `CycleSpectrumPeakFinder` and the three `kde` routes accept `datasetid`.
 Details, parameters and when to use each: `references/endpoints.md`.
