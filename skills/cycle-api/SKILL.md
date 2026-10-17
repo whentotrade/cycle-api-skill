@@ -62,9 +62,10 @@ POST /api/cycles/CycleScanner?datasetid=MYSERIES&maxbars=500      (no body)
 - `PUT` creates or replaces; `POST /api/datasets/{name}/bars` appends newer (or older) bars and may
   correct the last one; `GET /api/datasets` lists your datasets and your quota;
   `DELETE /api/datasets/{name}` frees the place.
-- `maxbars` (last n bars), `from` and `to` (UTC date or date-time; a date alone is 00:00 UTC) choose the window.
-  `from` is included, `to` is not: `to=2019-09-30` ends with the last bar before 30 September; to include a day,
-  give the day after it (`to=2019-10-01`).
+- `maxbars` (last n bars), `from` and `to` choose the window. Both are included: a date alone is the whole UTC day
+  (`from` 00:00:00, `to` 23:59:59), so `to=2019-09-30` ends with the bar of 30 September; a date-time keeps its time
+  (`to=2019-09-30T12:00:00Z` ends at noon, for intraday datasets), an offset such as `+02:00` is honoured, a time
+  without one is UTC. A value that is no date is answered `400`.
 - The answer carries `X-Dataset-Id`, `X-Dataset-Bars`, `X-Dataset-First`, `X-Dataset-Last`. A stored
   series changes as you append, so record these headers when a result must be reproducible.
 - `datasetid` also reaches datasets you uploaded in the app and your own streams.
@@ -359,7 +360,7 @@ from each. Full detail: `references/phase-guide.md`.
 | Bursts of calls get `429` | Honour `Retry-After`; Free allows 20 calls a minute, the trial and Pay as you go 300 |
 | `429` with "Your spending limit for this month is reached" | Pay as you go only: the account's own monthly limit is used up. Raise it on the API page of the app, or wait until the 1st (`Retry-After`); `my_limits` shows `spending` |
 | A stored series gives a different result than last week | It grew. Pin the window with `from`/`to` or read `X-Dataset-First`/`X-Dataset-Last` |
-| `to` taken as the last day of the window | `to` is not included: give the day after the last day you want |
+| Giving the day after the last day you want as `to` | `to` is included: give the last day itself. The day after would add that day's bars too |
 
 ---
 

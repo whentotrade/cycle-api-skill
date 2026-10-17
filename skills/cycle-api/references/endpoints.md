@@ -44,8 +44,8 @@ Window parameters, only with `datasetid`:
 | Param | Type | Meaning |
 |---|---|---|
 | `maxbars` | int | Only the last n bars |
-| `from` | string | Start of the window, **included** (UTC date or date-time; a date alone is 00:00 UTC) |
-| `to` | string | End of the window, **not included**: the window ends with the last bar before this moment. `to=2019-09-30` ends with the last bar before 30 September; to include a day, give the day after it (`to=2019-10-01`) |
+| `from` | string | Start of the window, **included**: the bar at this moment or the first one after it. A date alone is 00:00:00 UTC of that day; a time keeps its time, an offset (`+02:00`) is honoured, a time without one is UTC |
+| `to` | string | End of the window, **included**: the bar at this moment or the last one before it. A date alone is 23:59:59 UTC of that day, so `to=2019-09-30` ends with the bar of 30 September; a time keeps its time (`to=2019-09-30T12:00:00Z` ends at noon, for intraday datasets), an offset is honoured, a time without one is UTC. A value that is no date: `400` |
 
 With `datasetid` the answer carries four headers: `X-Dataset-Id`, `X-Dataset-Bars`,
 `X-Dataset-First`, `X-Dataset-Last`. Body and `datasetid` together: `400`. Unknown dataset or empty
@@ -352,7 +352,7 @@ Your own stored series, for use with `?datasetid=`.
 | Method | Path | Does |
 |---|---|---|
 | GET | `/api/datasets` | List your datasets and your quota |
-| GET | `/api/datasets/{name}` | One dataset with its bars; optional `from` (included), `to` (not included), both `yyyy-MM-dd HH:mm:ssZ`, and `maxbars` |
+| GET | `/api/datasets/{name}` | One dataset with its bars; optional `from` and `to` (both included; a date alone is the whole UTC day, a date-time keeps its time) and `maxbars` |
 | PUT | `/api/datasets/{name}` | Create or replace. Body: `[{ "dateUnix": 1758672000, "close": 101.2 }, ...]` |
 | POST | `/api/datasets/{name}/bars` | Append bars (same body). Bars before the first or after the last are added; the last bar may be corrected |
 | PATCH | `/api/datasets/{name}` | Body `{ "isPrivate": true }` or `false`. Private: only you read it |
