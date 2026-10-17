@@ -62,7 +62,9 @@ POST /api/cycles/CycleScanner?datasetid=MYSERIES&maxbars=500      (no body)
 - `PUT` creates or replaces; `POST /api/datasets/{name}/bars` appends newer (or older) bars and may
   correct the last one; `GET /api/datasets` lists your datasets and your quota;
   `DELETE /api/datasets/{name}` frees the place.
-- `maxbars` (last n bars), `from` and `to` (UTC date or date-time) choose the window.
+- `maxbars` (last n bars), `from` and `to` (UTC date or date-time; a date alone is 00:00 UTC) choose the window.
+  `from` is included, `to` is not: `to=2019-09-30` ends with the last bar before 30 September; to include a day,
+  give the day after it (`to=2019-10-01`).
 - The answer carries `X-Dataset-Id`, `X-Dataset-Bars`, `X-Dataset-First`, `X-Dataset-Last`. A stored
   series changes as you append, so record these headers when a result must be reproducible.
 - `datasetid` also reaches datasets you uploaded in the app and your own streams.
@@ -212,8 +214,9 @@ between the leading peaks and the rest. Add `useStability=true` (every plan) and
 arrays and `crsiSignal`. See `references/consensus-guide.md`.
 
 **Is the momentum stretched within the cycle?**
-Take the dominant cycle length L from the scan, then `DSP/CRSI?length=<L/2>` (keep L at most
-data length / 3, see pitfalls). Compare the last `crsi` value with `ub` and `lb`.
+Take the dominant cycle length L from the scan, then `DSP/CRSI?length=<L>`: `length` is the full cycle, the RSI
+inside runs over half of it (keep L below data length / 3, see Constraints). Compare the last `crsi` value with
+`ub` and `lb`.
 
 **Did the trend already turn?**
 `DSP/RSDtest` → `cit_index` lists the bars where the trend turned, at the chosen confidence (`conf`).
@@ -249,6 +252,9 @@ Store the series once (`PUT /api/datasets/NAME`) when you run more than one of t
   `dominantRank` (1 = most dominant, 0 = unranked): **only with `dominantPeakFinder=true` and a plan with the PRO
   features (the trial, Pay as you go, Scale)**; otherwise 0 and `license` says the step was skipped. Never filter on a
   field that was not computed, or every cycle disappears.
+- `dominantPeakFinder` (with `dominantPeakFinder=true`): what became of the ranking. `ranked`; `skipped` (no PRO
+  features, `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, so every
+  `dominantRank` is 0 for that reason: call once more).
 - Two phase groups, never mixed: average (`avgPhaseStatus`, `avgPhaseScore`, `minBarNum`) for scoring
   and regime; current (`phaseStatus`, `phaseScore`, `minBarNumCurrent`) for timing and projection.
   See **Phase strings and scores** below.
@@ -330,18 +336,21 @@ from each. Full detail: `references/phase-guide.md`.
   consensus 15–400 by default.
 - Bartels limit 0–99: default 49 for CycleScanner and CycleExplorer, 10 for consensus. Lower
   includes weaker cycles.
-- CRSI needs about three full repetitions of the cycle it is tuned to: keep the cycle length at
-  most **data length / 3**, otherwise `ub` and `lb` come back as NaN.
+- CRSI takes the **full** cycle as `length` (the RSI inside runs over half of it, the bands over twice it) and needs
+  a little more than three repetitions of it: the bands start after the first 3 × length + 4 bars, so keep the
+  length below **data length / 3** (at most (data length − 5) / 3), otherwise `ub` and `lb` come back as NaN.
 
 ## Pitfalls
 
 | Pitfall | Fix |
 |---|---|
 | Filtering on `stabilityScore` without `useStability`, or on `dominantRank` without `dominantPeakFinder` and the PRO features, discards every cycle | The field is 0 when its option did not run. Rank by `strength` and `bartelsValue` instead |
+| Every `dominantRank` 0 although `dominantPeakFinder=true` and the plan has the PRO features | Read the answer's `dominantPeakFinder`: `failed` means the ranking did not answer this time; call once more |
 | Treating `strength` as a percentage | It is a raw spectral weight; compare peaks relative to each other |
 | Mixing the average and current phase fields | Use `avgPhase*` + `minBarNum` together, or `phase*` + `minBarNumCurrent` together |
 | Reading direction from the phase score sign | Read the phase string (`Uptrend_Starting` = −95) |
-| CRSI bands all NaN | Cycle length above data length / 3; pick a shorter cycle |
+| CRSI bands all NaN | The bands start after 3 × length + 4 bars: the length is above (data length − 5) / 3. Pick a shorter cycle or send more values |
+| Passing half the cycle to `DSP/CRSI` | `length` is the full cycle; the RSI inside already halves it, so half the cycle gives an RSI over a quarter of it |
 | Results differ from the Cycle Scanner app | The app detrends with HP filter (`dType=0`) and uses its own band and window; send the same settings. `dType=9` (no detrending) gives very different strengths and ranks. `dType=4` (one-sided HP) avoids end-of-series bias when the latest bars matter |
 | Sending a bare array to `CycleConsensus/calculate` | It takes an object: `{"datapoints": [...], ...}` |
 | Body and `?datasetid=` in the same call | Refused with 400; send one or the other |
@@ -349,6 +358,7 @@ from each. Full detail: `references/phase-guide.md`.
 | Bursts of calls get `429` | Honour `Retry-After`; Free allows 20 calls a minute, the trial and Pay as you go 300 |
 | `429` with "Your spending limit for this month is reached" | Pay as you go only: the account's own monthly limit is used up. Raise it on the API page of the app, or wait until the 1st (`Retry-After`); `my_limits` shows `spending` |
 | A stored series gives a different result than last week | It grew. Pin the window with `from`/`to` or read `X-Dataset-First`/`X-Dataset-Last` |
+| `to` taken as the last day of the window | `to` is not included: give the day after the last day you want |
 
 ---
 

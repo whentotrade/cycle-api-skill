@@ -39,8 +39,8 @@ curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
 curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
      -X POST "$API/api/CycleConsensus/calculate?datasetid=MYSERIES" -d '{"includeCrsi": true}'
 
-# 4. CRSI tuned to a 60-bar cycle (length = half the cycle)
-curl -H "X-API-Key: $KEY" -X POST "$API/api/DSP/CRSI?datasetid=MYSERIES&length=30"
+# 4. CRSI tuned to a 60-bar cycle (length = the full cycle; the RSI inside runs over 30 bars)
+curl -H "X-API-Key: $KEY" -X POST "$API/api/DSP/CRSI?datasetid=MYSERIES&length=60"
 ```
 
 ---
@@ -107,10 +107,11 @@ consensus = call("POST", "/api/CycleConsensus/calculate",
 print(consensus["combinedScore"], consensus["crsiSignal"])
 print(consensus["combinedScoreReasoning"])
 
-# 4. CRSI tuned to the dominant cycle, capped at data length / 3
-cycle = min(dominant["cycleLength"], len(closes) / 3)
+# 4. CRSI tuned to the dominant cycle: length is the full cycle (the RSI inside runs over half of it);
+#    the bands start after 3 x length + 4 bars, so cap it below data length / 3
+cycle = min(dominant["cycleLength"], (len(closes) - 5) / 3)
 crsi = call("POST", "/api/DSP/CRSI",
-            params={"datasetid": "MYSERIES", "length": max(5, round(cycle / 2))}).json()
+            params={"datasetid": "MYSERIES", "length": int(cycle)}).json()
 last = crsi["crsi"][-1]
 state = "overbought" if last > crsi["ub"][-1] else "oversold" if last < crsi["lb"][-1] else "inside bands"
 print(round(last, 1), state)
