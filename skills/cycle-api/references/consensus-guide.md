@@ -45,6 +45,7 @@ consensus → CRSI.
 | `bearishCycleCount` | int | | Cycles in a bearish phase (falling + topping). |
 | `breadthFactor` | double | 0–1 | Cycles on the stronger side ÷ 5, at most 1. Information only: it does not change the score. |
 | `combinedScoreReasoning` | string | | Step-by-step text of how the score was derived. Every number in it has the sign of `combinedScore` (example below). |
+| `dominantPeakFinder` | string | | What became of the dominant-peak ranking that `rank` and `cycleQuality` rest on: `ranked`; `failed` (no answer this time: the cycles are ranked by strength instead, which can move the score; call once more); `skipped` (in a scan's `consensus` only: the scan had no PRO features). Left out when the scan behind it did not ask for the ranking. |
 
 ### The four phase arrays
 
@@ -92,8 +93,8 @@ short cycles is a different signal from one carried by long, structural cycles.
 |----------|------|-------------|
 | `crsiScore` | int | Raw CRSI score (−3 to +3). Drives the signal state and the score contribution. |
 | `crsiSignal` | string | Named signal state, see below. |
-| `crsiLength` | int | CRSI period: half the length of the best-quality cycle on the stronger side. |
-| `crsiSourceCycleLength` | int | The cycle length the CRSI period was derived from. |
+| `crsiLength` | int | The length the consensus gives the CRSI: half the best-quality cycle on the stronger side (50 when that side has no cycle; 0 when the CRSI is not applied). `DSP/CRSI` takes a full cycle as `length`, so the consensus's CRSI is that route with `length = crsiLength`: its RSI runs over `crsiLength / 2` bars, its bands over `2 × crsiLength`. |
+| `crsiSourceCycleLength` | int | The full cycle `crsiLength` was taken from (100 when the stronger side has no cycle; 0 when the CRSI is not applied). |
 | `hasBullishDivergence`, `hasBearishDivergence` | bool | Price/CRSI divergence near the last bar (pilot: label only, no effect on the score). |
 
 ### CRSI Signal States
@@ -149,14 +150,15 @@ and `rank` in the phase arrays are filled. Since 8 October 2026 CycleScanner sco
 too (`useStability=true`); its `includeConsensus=true` option answers the consensus of exactly the cycles it
 returns, with their stability scores and, with `dominantPeakFinder` (PRO), their ranks: the same `ConsensusResponse`
 as this route, in the field `consensus` of the scan's answer. If `stabilityScore` or `rank` come back as 0, the
-option that fills them did not run: rank by `strength` and `contribution`.
+option that fills them did not run: rank by `strength` and `contribution`. If `dominantPeakFinder` says `failed`, the
+ranking did not answer this time and the cycles were ranked by strength instead: call once more.
 
 ### App UI parity (Cycle Scanner gauge)
 
 The Cycle Consensus gauge in the Cycle Scanner app runs the **same pipeline with CRSI integration
 enabled** (`includeCrsi=true`). The app has no setting to switch the CRSI term off; its `crsi=true`
 URL parameter only toggles the CRSI chart panel. The app falls back to the pure cycle consensus only
-when CRSI cannot be computed: fewer than about 50 bars, or a CRSI length above data length / 3
+when CRSI cannot be computed: fewer than about 50 bars, or a CRSI length above (data length − 5) / 3
 (NaN bands).
 
 **If app gauge and API score differ,** the cause is almost always different scan inputs: the app uses
@@ -168,7 +170,7 @@ the scanner's band, Bartels limit, detrending and window, while `calculate` uses
 The Cycle Scanner app's "Cycle Consensus Index" gauge computes the same two-phase score: pure cycle consensus first, then a best-effort `ApplyCrsiScore` on top. Three cases silently fall back to the pure cycle consensus (series ≤ 50 bars, CRSI bands not computable, any exception in the CRSI step). Two further differences can move the number relative to an API call on "the same" data:
 
 1. **Inputs and window.** The gauge scores the scanner's peak list under the UI's current settings (band, Bartels, dType, maxbars). Note the app loads `maxbars` up to today and then cuts at `inSampleTimeEnd`, so the in-sample window is shorter than an API series truncated at the cutoff (e.g. 1138 vs. 1150 bars).
-2. **CRSI source-cycle derivation.** App and API can derive the CRSI period from different cycles. Verified example (silver `SI=F:YFI`, in-sample cut 2026-08-05, band 15–400, Bartels 10): the API derived CRSI from the 341-bar cycle (period 170), which sat below the lower band turning up — BearFatigue, contribution +13.3, score 93. The app derived CRSI length 77, which contributed nothing, so the gauge showed 80: exactly the pure cycle consensus. Same engine, same formula, different CRSI source cycle.
+2. **CRSI source-cycle derivation.** App and API can derive the CRSI length from different cycles. Verified example (silver `SI=F:YFI`, in-sample cut 2026-08-05, band 15–400, Bartels 10): the API derived CRSI from the 341-bar cycle (`crsiLength` 170), which sat below the lower band turning up — BearFatigue, contribution +13.3, score 93. The app derived CRSI length 77, which contributed nothing, so the gauge showed 80: exactly the pure cycle consensus. Same engine, same formula, different CRSI source cycle.
 
 When gauge and API disagree, check in this order: in-sample bar count, scanner parameters, then the CRSI length the app shows (the "cRSI: n" chart label) against `crsiSourceCycleLength`/`crsiLength` in the API response. A gauge equal to the API's `includeCrsi=false` value means the app's CRSI step did not contribute.
 

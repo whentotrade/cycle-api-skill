@@ -44,8 +44,8 @@ Window parameters, only with `datasetid`:
 | Param | Type | Meaning |
 |---|---|---|
 | `maxbars` | int | Only the last n bars |
-| `from` | string | First bar of the window (UTC date or date-time) |
-| `to` | string | Last bar of the window (UTC date or date-time) |
+| `from` | string | Start of the window, **included**: the bar at this moment or the first one after it. A date alone is 00:00:00 UTC of that day; a time keeps its time, an offset (`+02:00`) is honoured, a time without one is UTC |
+| `to` | string | End of the window, **included**: the bar at this moment or the last one before it. A date alone is 23:59:59 UTC of that day, so `to=2019-09-30` ends with the bar of 30 September; a time keeps its time (`to=2019-09-30T12:00:00Z` ends at noon, for intraday datasets), an offset is honoured, a time without one is UTC. A value that is no date: `400` |
 
 With `datasetid` the answer carries four headers: `X-Dataset-Id`, `X-Dataset-Bars`,
 `X-Dataset-First`, `X-Dataset-Last`. Body and `datasetid` together: `400`. Unknown dataset or empty
@@ -93,6 +93,7 @@ for projection, CRSI tuning or a composite.
 | `peaksString` | Short text summary of the peaks |
 | `statusCode` | `OK` for a result. A failed analysis (too few values, no cycle) comes with HTTP 400 and the reason here |
 | `license` | Notes on a skipped PRO step ("Dominant PeakFinder skipped: PRO level required …") or a consensus without stability scores |
+| `dominantPeakFinder` | With `dominantPeakFinder=true`: what became of the ranking. `ranked`; `skipped` (no PRO-level key, `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, every `dominantRank` is 0 for that reason: call once more). Left out otherwise |
 | `consensus` | With `includeConsensus=true`: the `ConsensusResponse` of these cycles (section 5); left out otherwise |
 
 **`CycleData` (one peak)**
@@ -103,7 +104,7 @@ for projection, CRSI tuning or a composite.
 | `amplitude` | Size of the wave in the units of your values |
 | `strength` | Raw spectral weight, **not a percentage**. Compare peaks with each other |
 | `bartelsValue` | Statistical significance of the cycle (higher = more significant) |
-| `dominantRank` | 1 = most dominant, 0 = unranked. Needs `dominantPeakFinder` and a PRO-level key, otherwise 0 |
+| `dominantRank` | 1 = most dominant, 0 = unranked. Needs `dominantPeakFinder` and a PRO-level key, otherwise 0 (the answer's `dominantPeakFinder` says why) |
 | `stabilityScore` | 0–1, consistency of amplitude and phase over time. Needs `useStability` (every plan), otherwise 0 |
 | `avgPhaseStatus`, `avgPhaseScore`, `avgPhase`, `minBarNum` | Average phase group: phase fitted across all repetitions. `minBarNum` = bar index of a trough |
 | `phaseStatus`, `phaseScore`, `phase`, `minBarNumCurrent` | Current phase group: phase fitted to the recent bars only |
@@ -204,8 +205,11 @@ consensus → CRSI.
 Answer (`ConsensusResponse`): `combinedScore`, `bullishConsensus`, `bearishConsensus`,
 `bullishCycleCount`, `bearishCycleCount`, `breadthFactor`, `crsiScore`, `crsiSignal`, `crsiLength`,
 `crsiSourceCycleLength`, `hasBullishDivergence`, `hasBearishDivergence`, `combinedScoreReasoning`,
-and four arrays of `CycleContributionDto`: `toppingCycles`, `bottomingCycles`, `risingCycles`,
-`fallingCycles`. Field meanings: `consensus-guide.md`.
+`dominantPeakFinder`, and four arrays of `CycleContributionDto`: `toppingCycles`, `bottomingCycles`,
+`risingCycles`, `fallingCycles`. Field meanings: `consensus-guide.md`.
+
+With `?datasetid=`, `maxbars`, `from` and `to` choose the window (section 1); the answer is the consensus at the
+last bar of the window, so a walk-forward test moves `to` one bar at a time.
 
 ---
 
@@ -220,14 +224,17 @@ Cyclic Smoothed RSI: an RSI tuned to a cycle, with dynamic upper and lower bands
 
 | Param | Type | Default | Meaning |
 |---|---|---|---|
-| `length` | int | `30` | Oscillator period. Use **half the dominant cycle length** |
+| `length` | int | `30` | The **full** length of the dominant cycle in bars, not the RSI period: the RSI inside runs over half of it (rounded down), the bands over twice it |
 
 Answer (`Crsi_indicator`): `{ "crsi": [...], "ub": [...], "lb": [...] }`, one value per input bar.
 CRSI above `ub` = overbought, below `lb` = oversold.
 
-The bands need about three repetitions of the underlying cycle. If the cycle length is more than
-data length / 3, `ub` and `lb` are all NaN while `crsi` stays valid. Example: with 583 values the
-longest usable cycle is 194 bars.
+Pass the cycle itself: half the cycle gives an RSI over a quarter of it. The CRSI inside the Cycle Consensus is
+this route with `length = crsiLength`, which is half its source cycle (`consensus-guide.md`).
+
+The bands start after the first 3 × length + 4 bars, a little more than three repetitions of the cycle. With a
+longer length `ub` and `lb` are all NaN while `crsi` stays valid. Example: with 583 values the longest cycle with
+bands is 192 bars, and its bands cover only the last 3 bars.
 
 ---
 
@@ -345,7 +352,7 @@ Your own stored series, for use with `?datasetid=`.
 | Method | Path | Does |
 |---|---|---|
 | GET | `/api/datasets` | List your datasets and your quota |
-| GET | `/api/datasets/{name}` | One dataset with its bars; optional `from`, `to` (`yyyy-MM-dd HH:mm:ssZ`), `maxbars` |
+| GET | `/api/datasets/{name}` | One dataset with its bars; optional `from` and `to` (both included; a date alone is the whole UTC day, a date-time keeps its time) and `maxbars` |
 | PUT | `/api/datasets/{name}` | Create or replace. Body: `[{ "dateUnix": 1758672000, "close": 101.2 }, ...]` |
 | POST | `/api/datasets/{name}/bars` | Append bars (same body). Bars before the first or after the last are added; the last bar may be corrected |
 | PATCH | `/api/datasets/{name}` | Body `{ "isPrivate": true }` or `false`. Private: only you read it |
