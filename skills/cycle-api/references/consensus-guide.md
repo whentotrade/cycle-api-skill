@@ -94,7 +94,7 @@ short cycles is a different signal from one carried by long, structural cycles.
 | `crsiScore` | int | Raw CRSI score (−3 to +3). Drives the signal state and the score contribution. |
 | `crsiSignal` | string | Named signal state, see below. |
 | `crsiLength` | int | The length the consensus gives the CRSI: half the best-quality cycle on the stronger side (50 when that side has no cycle; 0 when the CRSI is not applied). `DSP/CRSI` takes a full cycle as `length`, so the consensus's CRSI is that route with `length = crsiLength`: its RSI runs over `crsiLength / 2` bars, its bands over `2 × crsiLength`. |
-| `crsiSourceCycleLength` | int | The full cycle `crsiLength` was taken from (100 when the stronger side has no cycle). |
+| `crsiSourceCycleLength` | int | The full cycle `crsiLength` was taken from (100 when the stronger side has no cycle; 0 when the CRSI is not applied). |
 | `hasBullishDivergence`, `hasBearishDivergence` | bool | Price/CRSI divergence near the last bar (pilot: label only, no effect on the score). |
 
 ### CRSI Signal States
@@ -158,7 +158,7 @@ ranking did not answer this time and the cycles were ranked by strength instead:
 The Cycle Consensus gauge in the Cycle Scanner app runs the **same pipeline with CRSI integration
 enabled** (`includeCrsi=true`). The app has no setting to switch the CRSI term off; its `crsi=true`
 URL parameter only toggles the CRSI chart panel. The app falls back to the pure cycle consensus only
-when CRSI cannot be computed: fewer than about 50 bars, or a CRSI length above data length / 3
+when CRSI cannot be computed: fewer than about 50 bars, or a CRSI length above (data length − 5) / 3
 (NaN bands).
 
 **If app gauge and API score differ,** the cause is almost always different scan inputs: the app uses

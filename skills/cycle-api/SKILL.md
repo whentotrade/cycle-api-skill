@@ -281,7 +281,8 @@ projected top/low), `lasttop` / `lastlow` (bars back), `phasingScore`, `cyclePro
 vote of each side: raw sums, not percentages), `bullishCycleCount` / `bearishCycleCount`,
 `breadthFactor` (0–1, information only), `crsiScore` (−3…+3), `crsiSignal`, `crsiLength`,
 `crsiSourceCycleLength`, `hasBullishDivergence` / `hasBearishDivergence`, `combinedScoreReasoning`
-(step-by-step text, every number in the sign of the score), and four arrays of per-cycle contributions:
+(step-by-step text, every number in the sign of the score), `dominantPeakFinder` (the ranking status, as in the
+scan), and four arrays of per-cycle contributions:
 `toppingCycles`, `bottomingCycles`, `risingCycles`, `fallingCycles`. The arrays follow each cycle's
 **average** phase; every entry reports both phases (`avgPhaseScore` / `avgPhaseStatus` and
 `currentPhaseScore` / `currentPhaseStatus`), and the current one can already be one array further.
@@ -345,7 +346,7 @@ from each. Full detail: `references/phase-guide.md`.
 | Pitfall | Fix |
 |---|---|
 | Filtering on `stabilityScore` without `useStability`, or on `dominantRank` without `dominantPeakFinder` and the PRO features, discards every cycle | The field is 0 when its option did not run. Rank by `strength` and `bartelsValue` instead |
-| Every `dominantRank` 0 although `dominantPeakFinder=true` and the plan has the PRO features | Read the answer's `dominantPeakFinder`: `failed` means the ranking did not answer this time; call once more |
+| Every `dominantRank` 0 although `dominantPeakFinder=true` and the plan has the PRO features | Read the answer's `dominantPeakFinder`: `failed` means the ranking did not answer this time; call once more. With `ranked`, a `dominantPeakFinderBartels` above the cycles' `bartelsValue` leaves them unranked |
 | Treating `strength` as a percentage | It is a raw spectral weight; compare peaks relative to each other |
 | Mixing the average and current phase fields | Use `avgPhase*` + `minBarNum` together, or `phase*` + `minBarNumCurrent` together |
 | Reading direction from the phase score sign | Read the phase string (`Uptrend_Starting` = −95) |

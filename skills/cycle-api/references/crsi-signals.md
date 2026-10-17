@@ -5,8 +5,8 @@
 The Cyclic RSI (CRSI) is a smoothed cyclic RSI oscillator that oscillates between 0 and 100, with dynamically calculated upper band (UB) and lower band (LB) that define overbought and oversold zones. The Cycle Consensus endpoints convert CRSI's position relative to its bands into a discrete `crsiScore` (−3 to +3) and a named `crsiSignal`. This guide explains how that value is derived, so you can read it correctly.
 
 The API applies two rules when it computes CRSI for consensus:
-- **CRSI length**: the consensus gives the CRSI half the best-quality cycle on the stronger side (`crsiLength`, taken from `crsiSourceCycleLength`). `DSP/CRSI` takes a full cycle as its `length` and runs its RSI over half of it, so the consensus's CRSI is `DSP/CRSI?length=<crsiLength>`: an RSI over a quarter of the source cycle, bands over the source cycle. That is the setting the consensus score was validated with. For a CRSI of your own, pass the full cycle (`endpoints.md`, section 6).
-- **Band constraint**: the bands start after the first 3 × length + 4 bars; with a longer length they are all NaN. See the CRSI endpoint documentation for details.
+- **CRSI length**: the consensus gives the CRSI half the best-quality cycle on the stronger side (`crsiLength`, taken from `crsiSourceCycleLength`). `DSP/CRSI` takes a full cycle as its `length` and runs its RSI over half of it, so the consensus's CRSI is `DSP/CRSI?length=<crsiLength>`: an RSI over a quarter of the source cycle, bands over the source cycle. That is the consensus's own setting, and it stays. For a CRSI of your own, pass the full cycle (`endpoints.md`, section 6).
+- **Band constraint**: the bands start after the first 3 × length + 4 bars; with a length above (data length − 5) / 3 they are all NaN. See the CRSI endpoint documentation for details.
 
 ---
 
