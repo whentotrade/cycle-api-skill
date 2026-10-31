@@ -3,8 +3,8 @@ name: cycle-api
 description: >
   How to use the Cycles IQ API (api.cyclesiq.com, cycle analysis) from an AI agent or code, and
   how to read every result. The API analyses the caller's own time series: send the values
-  with each call or store them once as a dataset and name it with ?datasetid=; markets found
-  with the symbol search can be analysed by id (the answer carries the cycles, not the prices). Covers cycle
+  with each call or store them once as a dataset and name it with ?datasetid=; accounts with the
+  feature MarketDataAccess also search the app's markets and analyse them by id. Covers cycle
   scanning (CycleScanner), the dominant cycle with forward projection (CycleExplorer), DSP
   filters (detrend, Savitzky-Golay, sinc smoothing, CRSI), trend turning points (RSD t-test),
   cycle-length clustering (KDE), the Cycle Consensus score, stored datasets, and limits/usage.
@@ -107,9 +107,10 @@ show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `p
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
 PRO features: `dominantPeakFinder`, `CycleSpectrumPeakFinder` (`useStability` is open to every plan since 8 October
-2026). The raw bars of market
-data are part of no plan (the feature `MarketDataAccess`, granted on request). Read the current numbers
-from `GET /api/me/limits` rather than hard-coding them.
+2026). Market data is part of no plan: the symbol search, the analyses of markets by id and the raw
+bars need the feature `MarketDataAccess`, granted on request to known customers (one rule for the REST API
+and the MCP server since 31 October 2026). Read the current numbers from `GET /api/me/limits` rather than
+hard-coding them.
 
 **Answers you will see**
 
@@ -117,33 +118,37 @@ from `GET /api/me/limits` rather than hard-coding them.
 |---|---|---|
 | `400` | Bad input (too few values, body and `datasetid` together, bad name). Body is a `ProblemDetails` object | Fix the request |
 | `401` | No valid key or sign-in | Check the header; sign up if you have no account |
-| `403` with a message | The route or feature is not part of your plan (raw bars, another user's dataset, streams) | Retrying does not help; the message says what to do |
+| `403` with a message | The route or feature is not part of your plan (a market id or the symbol search without `MarketDataAccess`, raw bars, another user's dataset, streams) | Retrying does not help; the message says what to do |
 | `404` | `datasetid` names no dataset of yours, or the window is empty | Check `GET /api/datasets` |
 | `429` with `Retry-After` | A limit: the speed, the day, or the allowance of the month or the trial; the body names the plan, the limit and `upgradeUrl` | Wait the given seconds; a long `Retry-After` means the allowance, not a burst |
 
 ---
 
-## Market data by id (REST only)
+## Market data by id (the feature `MarketDataAccess`)
 
-`GET /api/data/SearchSymbols?search=apple` finds markets (stocks, ETFs, crypto, forex, economic
-series; no index series). Each hit's `symbolId` (ending in `:HID`) is the id: pass it as
-`?datasetid=<symbolId>` to a cycle analysis (CycleScanner, CycleExplorer, CyclePowerScanner, CRSI, the
-consensus calculation). The API analyses the market's last 1,250 days unless `maxbars` or `from` say
-otherwise, brings the data up to date first, and names what it analysed in `analysedWindow` (`first`,
-`last`, `bars`, `symbol`, `name`). The answer carries the cycles; the price fields are left out (the
-feature `MarketDataAccess` opens them). Smoothing, detrending and the RSD test take a market id only
-with that feature. The MCP server has no market data at all (below).
+The app's markets are a feature of their own, `MarketDataAccess`, granted on request to known customers;
+no plan includes it, and the rule is the same for the REST API and the MCP server (since 31 October 2026).
+With it, `GET /api/data/SearchSymbols?search=apple` (the tool `search_symbols`) finds markets (stocks,
+ETFs, crypto, forex, economic series; no index series). Each hit's `symbolId` (ending in `:HID`) is the
+id: pass it as `?datasetid=<symbolId>` to a cycle analysis (CycleScanner, CycleExplorer,
+CyclePowerScanner, CRSI, the consensus calculation). The API analyses the market's last 1,250 days unless
+`maxbars` or `from` say otherwise, brings the data up to date first, and names what it analysed in
+`analysedWindow` (`first`, `last`, `bars`, `symbol`, `name`). Through the REST API the answer carries the
+prices too; through the MCP server never. Smoothing, detrending and the RSD test take a market id through
+the REST API only (their answer is the series itself). Without the feature a market id and the search are
+answered `403` with a message that names the feature; every analysis then takes your own data.
 
 ---
 
 ## Using it through MCP
 
-The same API is an MCP server: `https://api.cyclesiq.com/mcp` (Streamable HTTP). Its 15 tools are the
+The same API is an MCP server: `https://api.cyclesiq.com/mcp` (Streamable HTTP). Its 16 tools are the
 analyses of **your own data** (scanner, explorer, consensus, CRSI, DSP filters, RSD test, KDE, DTW
-clustering of your datasets, store/list/get your datasets, `my_limits`, `help`); a tool call is judged
-and counted like a direct call. The server provides no market data and has no symbol search: take the
-values from the user, a file or another connector and pass them as `datapoints`, or store them once
-with `store_dataset` and name them.
+clustering of your datasets, store/list/get your datasets, `my_limits`, `help`) and, for accounts with
+the feature `MarketDataAccess`, the symbol search (`search_symbols`: its `symbolId` goes as `datasetid`
+to the analyses; the answers never carry prices there); a tool call is judged and counted like a direct
+call. Without the feature the server provides no market data: take the values from the user, a file or
+another connector and pass them as `datapoints`, or store them once with `store_dataset` and name them.
 
 - **Every call needs an account.** Clients with OAuth (Claude.ai, Claude Desktop, ChatGPT, Claude Code,
   Cursor) are asked to sign in with a Cycles IQ account; signing up is free and starts the 30-day trial.
@@ -185,7 +190,7 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 | GET | `/api/DSP/kde-auto-summary` | Same, with a summary per cluster |
 | GET · PUT · PATCH · DELETE | `/api/datasets`, `/api/datasets/{name}` | Your stored datasets |
 | POST | `/api/datasets/{name}/bars` | Append bars |
-| GET | `/api/data/SearchSymbols` | Find a market; its `symbolId` is the id for `?datasetid=` |
+| GET | `/api/data/SearchSymbols` | Find a market (feature `MarketDataAccess`); its `symbolId` is the id for `?datasetid=` |
 | GET | `/api/me/limits` · `/api/me/usage` | Your plan, limits and usage |
 | POST | `/api/Stream/SubmitStreamData` | Live data (plans with streams); send to the stream host `https://streams.cyclesiq.com` |
 

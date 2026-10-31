@@ -437,15 +437,17 @@ For a one-off upload without live updates use `PUT /api/datasets/{name}` instead
 
 **GET** `/api/data/SearchSymbols?search=<ticker or name>&limit=20`
 
+Needs the feature `MarketDataAccess` (granted on request to known customers; no plan includes it; one
+rule for the REST API and the MCP server since 31 October 2026, where the tool is `search_symbols`).
 Finds markets by ticker or name (stocks, ETFs, crypto, forex, economic series; index series are not
 offered). Each hit: `symbol`, `symbolId` (the market's id, ending in `:HID`), `shortName`, `exchange`,
 `currency`, `type`. Pass the `symbolId` as `?datasetid=` to a cycle analysis (CycleScanner,
 CycleExplorer, CyclePowerScanner, CRSI, the consensus calculation): the API brings the market up to
 date, analyses its last 1,250 days unless `maxbars` or `from` say otherwise, and names the window in the
-answer's `analysedWindow` (`datasetId`, `first`, `last`, `bars`, `symbol`, `name`). The price fields are
-left out of the answer; the raw bars are the feature `MarketDataAccess` (granted on request), as are
-market ids on the routes whose answer is the series itself (Detrend, SavGol, SincSmoother, RSDtest). Not
-available through the MCP server.
+answer's `analysedWindow` (`datasetId`, `first`, `last`, `bars`, `symbol`, `name`). Through the REST API
+the answer carries the price fields; through the MCP server never. The raw bars are the same feature, as
+are market ids on the routes whose answer is the series itself (Detrend, SavGol, SincSmoother, RSDtest;
+REST only). Without the feature: `403` with a message that names it.
 
 ---
 ## 18. CycleDetails
