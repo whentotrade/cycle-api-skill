@@ -90,10 +90,10 @@ Every successful answer outside `/api/me/*` names the call's value in tokens in 
 `X-CyclesIQ-Tokens`: the rating of its route plus one token for every 1,000 data points it works on or
 part of them; ten stream updates are one token. `GET /api/me/limits` adds them up (`tokensToday`, `tokensMonth`,
 `tokensMonthByChannel`). The plan limits calls; the tokens are the value of the usage: Pay as you go is
-billed by the tokens of calls by API key and MCP, stream updates included (never the app's own calls), at
+billed by the tokens of calls by API key and MCP, stream updates included (the app's own calls are not billed), at
 1.75 EUR per 1,000 tokens plus VAT where it applies, billed monthly through Stripe with Link as the merchant of
 record (the invoice comes from Link; payment method, invoices and cancellation in Stripe's customer portal from the
-API page). A Pay as you go account has a monthly spending limit it
+API page). The Member plan is billed the same way at half the price (0.875 EUR per 1,000 tokens). A Pay as you go or Member account has a monthly spending limit it
 sets itself on the API page of the app (50 EUR a month unless changed): at 100 % every call by key or MCP,
 stream updates included, is refused with `429` and "Your spending limit for this month is reached. Raise it
 on the API page, or wait until the 1st." (`Retry-After` = seconds to the 1st; a refused call costs nothing);
@@ -103,10 +103,11 @@ show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `p
 
 | Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
 |---|---|---|---|---|---|---|---|
-| 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls are used, whichever comes first | 300 | – | 5,000 calls in the trial | yes | 50 | 3 |
+| 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls or its 20,000 tokens of the app's own calls are used, whichever comes first | 300 | – | 5,000 calls in the trial (the app's calls apart: 20,000 tokens) | yes | 50 | 3 |
 | Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
 | FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | no | 3 | by membership |
 | Pay as you go | a Cycles IQ account; booked on the API page of the app (app.cyclesiq.com, Account > API) | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
+| Member | members of the Cycles IQ Membership and the Cycles IQ Pro Membership, set on the account when they join | 600 | 50,000 (safety cap) | none; billed per token at half the price, capped by your own spending limit | yes | 100 | 75 |
 | Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
 
 PRO features: `dominantPeakFinder`, `CycleSpectrumPeakFinder` (`useStability` is open to every plan since 8 October
@@ -256,7 +257,7 @@ Store the series once (`PUT /api/datasets/NAME`) when you run more than one of t
 - `bartelsValue`: statistical significance (higher is more significant); `bartelsLimit` filters it.
 - `stabilityScore` (0–1): **only computed with `useStability=true`** (every plan since 8 October 2026); otherwise 0.
   `dominantRank` (1 = most dominant, 0 = unranked): **only with `dominantPeakFinder=true` and a plan with the PRO
-  features (the trial, Pay as you go, Scale)**; otherwise 0 and `license` says the step was skipped. Never filter on a
+  features (the trial, Pay as you go, Member, Scale)**; otherwise 0 and `license` says the step was skipped. Never filter on a
   field that was not computed, or every cycle disappears.
 - `dominantPeakFinder` (with `dominantPeakFinder=true`): what became of the ranking. `ranked`; `skipped` (no PRO
   features, `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, so every

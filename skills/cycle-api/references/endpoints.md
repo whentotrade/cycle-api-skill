@@ -369,15 +369,18 @@ Your own stored series, for use with `?datasetid=`.
 
 ## 14. Limits and usage
 
-- **GET** `/api/me/limits` → `tier`, `plan` (30-day trial, Free, FSC member, Pay as you go, Scale),
+- **GET** `/api/me/limits` → `tier`, `plan` (30-day trial, Free, FSC member, Pay as you go, Member, Scale),
   `limits` (`perMinute`, `perDay`, `usedToday`, `allowance`, `allowanceCalls`, `allowanceUsed`,
   `allowanceResetsAt`, `pro`, `datasets`, `barsPerDataset`, `streams`, `uploads`, `counting`), and per
   endpoint group `included` (false = not in your plan: streams, uploads), `reason`, and your calls
-  `today` and this `month`. Totals: `totalToday`, `totalMonth`. `trial` says when a trial ends.
+  `today` and this `month`. Totals: `totalToday`, `totalMonth`. `trial` says when a trial ends, its calls
+  (`calls`, `used`, `callsUsedUp`) and the budget of the app's own calls (`tokens`, `tokensUsed`, `tokensUsedUp`).
   Every call counts once, whatever the route; the numbers lag live counters by about a minute.
   Tokens, the value of the calls: `tokensToday`, `tokensMonth`, `tokensMonthByChannel` (`app`, `key`,
-  `mcp`, ...), per group `tokensToday` and `tokensMonth`, and `tokenRule` (what a token is). On Pay as
-  you go `spending`: `limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `percent`, `notice` (from 80 %),
+  `mcp`, ...), per group `tokensToday` and `tokensMonth`, and `tokenRule` (what a token is). What reaches the
+  bill: `tokensBilledMonth`, of it `appTokensBilledMonth`, and `appTokenRate` (the share of the price the app's own
+  calls are billed at; 0 = not billed) with `appTokensFrom` (the first billed day). On Pay as you go and Member
+  `spending`: `limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `percent`, `notice` (from 80 %),
   `reached`, `resetsAt`, `text`; null on other plans (the spending limit, set on the API page of the app). Every
   successful answer outside `/api/me/*` names its own tokens in the header `X-CyclesIQ-Tokens`. The
   plan limits calls, not tokens.
