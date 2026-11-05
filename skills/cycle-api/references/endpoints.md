@@ -9,7 +9,7 @@ authoritative: https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger
 1. [Supplying data: body or `datasetid`](#1-supplying-data-body-or-datasetid)
 2. [CycleScanner](#2-cyclescanner)
 3. [CycleExplorer](#3-cycleexplorer)
-4. [CycleSpectrumPeakFinder](#4-cyclespectrumpeakfinder-pro)
+4. [CycleSpectrumPeakFinder](#4-cyclespectrumpeakfinder)
 5. [CycleConsensus/calculate](#5-cycleconsensuscalculate)
 6. [CRSI](#6-crsi)
 7. [Detrend](#7-detrend)
@@ -76,7 +76,7 @@ for projection, CRSI tuning or a composite.
 | `cycleResolution` | number | `1.0` | Spectrum step: `1.0` or `0.1` |
 | `amplitudeMulti` | number | `1.0` | Multiplier for series with very small values (e.g. forex) |
 | `useStability` | bool | `false` | Stability score per cycle, 0–1 (every plan since 8 October 2026) |
-| `dominantPeakFinder` | bool | `false` | Rank peaks by the shape of the spectrum *(PRO-level key)* |
+| `dominantPeakFinder` | bool | `false` | Rank peaks by the shape of the spectrum (every plan since 5 November 2026) |
 | `dominantPeakFinderBartels` | int | `0` | With `dominantPeakFinder`: a rank only for a cycle whose `bartelsValue` reaches this (the Cycle Scanner app uses its setting, 10); 0 = every cycle the finder names |
 | `includeSpectrum` | bool | `false` | Return the full spectrum array |
 | `humanReadableText` | bool | `false` | Return plain text instead of JSON |
@@ -92,8 +92,8 @@ for projection, CRSI tuning or a composite.
 | `spectrum` | Spectrum amplitudes (with `includeSpectrum=true`) |
 | `peaksString` | Short text summary of the peaks |
 | `statusCode` | `OK` for a result. A failed analysis (too few values, no cycle) comes with HTTP 400 and the reason here |
-| `license` | Notes on a skipped PRO step ("Dominant PeakFinder skipped: PRO level required …") or a consensus without stability scores |
-| `dominantPeakFinder` | With `dominantPeakFinder=true`: what became of the ranking. `ranked`; `skipped` (no PRO-level key, `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, every `dominantRank` is 0 for that reason: call once more). Left out otherwise |
+| `license` | Notes on a ranking that named none of the listed cycles ("Dominant PeakFinder skipped: the ranking named …"), a ranking that did not answer, or a consensus without stability scores |
+| `dominantPeakFinder` | With `dominantPeakFinder=true`: what became of the ranking. `ranked`; `skipped` (the ranking named none of the listed cycles, or the scan had no spectrum; `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, every `dominantRank` is 0 for that reason: call once more). Left out otherwise |
 | `consensus` | With `includeConsensus=true`: the `ConsensusResponse` of these cycles (section 5); left out otherwise |
 
 **`CycleData` (one peak)**
@@ -104,7 +104,7 @@ for projection, CRSI tuning or a composite.
 | `amplitude` | Size of the wave in the units of your values |
 | `strength` | Raw spectral weight, **not a percentage**. Compare peaks with each other |
 | `bartelsValue` | Statistical significance of the cycle (higher = more significant) |
-| `dominantRank` | 1 = most dominant, 0 = unranked. Needs `dominantPeakFinder` and a PRO-level key, otherwise 0 (the answer's `dominantPeakFinder` says why) |
+| `dominantRank` | 1 = most dominant, 0 = unranked. Needs `dominantPeakFinder`, otherwise 0 (the answer's `dominantPeakFinder` says why) |
 | `stabilityScore` | 0–1, consistency of amplitude and phase over time. Needs `useStability` (every plan), otherwise 0 |
 | `avgPhaseStatus`, `avgPhaseScore`, `avgPhase`, `minBarNum` | Average phase group: phase fitted across all repetitions. `minBarNum` = bar index of a trough |
 | `phaseStatus`, `phaseScore`, `phase`, `minBarNumCurrent` | Current phase group: phase fitted to the recent bars only |
@@ -114,8 +114,8 @@ for projection, CRSI tuning or a composite.
 Never mix the two phase groups; see `phase-guide.md`.
 
 **Reading it:** drop cycles shorter than about 30 bars as noise; look for a clear gap in `strength`
-between the leading peaks and the rest; with a PRO-level key prefer `dominantRank > 0` and
-`stabilityScore >= 0.5` for projection. Without PRO, never filter on those two fields (they are 0).
+between the leading peaks and the rest; with `dominantPeakFinder` and `useStability` prefer `dominantRank > 0` and
+`stabilityScore >= 0.5` for projection. Without those options, never filter on the two fields (they are 0).
 
 ---
 
@@ -150,18 +150,18 @@ the next top or low?"
 | `phasingScore`, `cycleProfitability` | Quality scores of the detected cycle (higher is better) |
 | `barsused`, `barsAvailable`, `analysisStartDate`, `analysisEndDate`, `currentPrice` | Window and last value |
 | `timeSeries` | With `includeTimeseries=true`: `{ price, smoothedPrice, date, dateUnix, dominantCycle, cycleHighlighter }` per bar |
-| `statusCode`, `license` | `OK` for a result, and notes on skipped PRO steps. A failed analysis comes with HTTP 400 and the reason in `statusCode`: 100 values or fewer, or no cycle between the lengths at the Bartels limit (widen the range or lower the limit). The same object, zeros elsewhere; a failed call costs no tokens |
+| `statusCode`, `license` | `OK` for a result, and notes on skipped steps. A failed analysis comes with HTTP 400 and the reason in `statusCode`: 100 values or fewer, or no cycle between the lengths at the Bartels limit (widen the range or lower the limit). The same object, zeros elsewhere; a failed call costs no tokens |
 
 The answer also has `stabilityScore`, `bullishConsensus`, `bearishConsensus`, `combinedScore` and
-`usedDominantRank`; treat them as informational (they depend on PRO steps).
+`usedDominantRank`; treat them as informational (they depend on the stability and ranking steps).
 
 ---
 
-## 4. CycleSpectrumPeakFinder *(PRO)*
+## 4. CycleSpectrumPeakFinder
 
 **POST** `/api/cycles/CycleSpectrumPeakFinder`
 
-Ranks the peaks of a spectrum you already have by their visual shape. Needs a PRO-level key.
+Ranks the peaks of a spectrum you already have by their visual shape. Every plan since 5 November 2026.
 Takes no `datasetid`.
 
 **Use it when** you ran `CycleScanner` with `includeSpectrum=true` and want the dominant peaks judged
@@ -173,8 +173,12 @@ Body (`FindPeaksSend`):
 { "spectrum": [0.1, 0.4, 1.2, ...], "cycleStart": 5, "cycleEnd": 400, "cycleResolution": 1.0 }
 ```
 
+Send a CycleScanner spectrum with its own `cycleStart`, `cycleEnd` and `cycleResolution`: the scanner's steps 1.0,
+0.99, 0.1 or 0.01, an axis within 0 to 400, at least 101 points and at most the axis' points, no NaN or Infinity.
+Anything else is refused with HTTP 400 and the reason, and so is a spectrum without dominant peaks.
+
 Answer (`PeaksFinderResults`): `cyclingScore`, `cyclingRating`, `peaks_dominant` (the dominant cycle
-lengths), `peaks` (all peak lengths).
+lengths), `peaks` (all peaks, as positions in the spectrum padded with zeros below `cycleStart`).
 
 ---
 
@@ -320,7 +324,7 @@ Answer (`RSD_Series`): `cit_index` (bar indices of trend turns), `cit_confidence
 **POST** `/api/DSP/CyclePowerScanner`
 
 A second spectrum implementation. Same idea as CycleScanner, fewer options (no detrending choice,
-no PRO steps). Answers with a JSON string in the shape of `CycleScannerResults`; parse it.
+no ranking or stability steps). Answers with a JSON string in the shape of `CycleScannerResults`; parse it.
 
 Params: `minCycleLength` (default 5), `maxCycleLength` (400), `bartelsLimit` (49), `amplitudeMulti`,
 `cycleResolution`, `savgolSmoothing`, `savgolSmoothingSpectrum`, `sortByStrength`,

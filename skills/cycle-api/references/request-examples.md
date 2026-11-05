@@ -86,7 +86,7 @@ scan = call("POST", "/api/cycles/CycleScanner",
             params={"minCycleLength": 10, "maxCycleLength": 200}, json=closes).json()
 peaks = [p for p in scan["peaks"] if p["cycleLength"] >= 30]
 peaks.sort(key=lambda p: p["strength"], reverse=True)
-# Without a PRO-level key stabilityScore and dominantRank are 0: rank by strength only.
+# Without useStability and dominantPeakFinder, stabilityScore and dominantRank are 0: rank by strength only.
 dominant = peaks[0]
 print(dominant["cycleLength"], dominant["avgPhaseStatus"], dominant["avgPhaseScore"])
 

@@ -45,7 +45,7 @@ consensus → CRSI.
 | `bearishCycleCount` | int | | Cycles in a bearish phase (falling + topping). |
 | `breadthFactor` | double | 0–1 | Cycles on the stronger side ÷ 5, at most 1. Information only: it does not change the score. |
 | `combinedScoreReasoning` | string | | Step-by-step text of how the score was derived. Every number in it has the sign of `combinedScore` (example below). |
-| `dominantPeakFinder` | string | | What became of the dominant-peak ranking that `rank` and `cycleQuality` rest on: `ranked`; `failed` (no answer this time: the cycles are ranked by strength instead, which can move the score; call once more); `skipped` (in a scan's `consensus` only: the scan had no PRO features). Left out when the scan behind it did not ask for the ranking. |
+| `dominantPeakFinder` | string | | What became of the dominant-peak ranking that `rank` and `cycleQuality` rest on: `ranked`; `failed` (no answer this time: the cycles are ranked by strength instead, which can move the score; call once more); `skipped` (the ranking named none of the cycles: the cycles are ranked by strength). Left out when the scan behind it did not ask for the ranking. |
 
 ### The four phase arrays
 
@@ -148,7 +148,7 @@ Sign: positive = bullish, negative = bearish
 The consensus route runs stability scoring and dominant peak detection for every caller, so `stabilityScore`
 and `rank` in the phase arrays are filled. Since 8 October 2026 CycleScanner scores the stability for every plan
 too (`useStability=true`); its `includeConsensus=true` option answers the consensus of exactly the cycles it
-returns, with their stability scores and, with `dominantPeakFinder` (PRO), their ranks: the same `ConsensusResponse`
+returns, with their stability scores and, with `dominantPeakFinder` (every plan since 5 November 2026), their ranks: the same `ConsensusResponse`
 as this route, in the field `consensus` of the scan's answer. If `stabilityScore` or `rank` come back as 0, the
 option that fills them did not run: rank by `strength` and `contribution`. If `dominantPeakFinder` says `failed`, the
 ranking did not answer this time and the cycles were ranked by strength instead: call once more.

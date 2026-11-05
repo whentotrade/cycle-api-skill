@@ -101,17 +101,17 @@ from 80 % every answer carries `X-CyclesIQ-Spending: 82% of 50 EUR`. `GET /api/m
 show it under `spending` (`limitEur`, `limitTokens`, `usedTokens`, `usedEur`, `percent`, `notice`,
 `reached`, `resetsAt`); on every other plan `spending` is null.
 
-| Plan | Who | Per minute | Per day | Allowance | PRO features | Stored datasets | Live streams |
-|---|---|---|---|---|---|---|---|
-| 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls or its 20,000 tokens of the app's own calls are used, whichever comes first | 300 | – | 5,000 calls in the trial (the app's calls apart: 20,000 tokens) | yes | 50 | 3 |
-| Free | after the trial | 20 | 200 | 1,000 a month | no | 3 | none |
-| FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | no | 3 | by membership |
-| Pay as you go | a Cycles IQ account; booked on the API page of the app (app.cyclesiq.com, Account > API) | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | yes | 50 | 50 |
-| Member | members of the Cycles IQ Membership and the Cycles IQ Pro Membership, set on the account when they join | 600 | 50,000 (safety cap) | none; billed per token at half the price, capped by your own spending limit | yes | 100 | 75 |
-| Scale | by agreement | 1,500 | 100,000 (safety cap) | none | yes | 500 | 100 |
+| Plan | Who | Per minute | Per day | Allowance | Stored datasets | Live streams |
+|---|---|---|---|---|---|---|
+| 30-day trial | every new account, 30 days from sign-up or until its 5,000 calls or its 20,000 tokens of the app's own calls are used, whichever comes first | 300 | – | 5,000 calls in the trial (the app's calls apart: 20,000 tokens) | 50 | 3 |
+| Free | after the trial | 20 | 200 | 1,000 a month | 3 | none |
+| FSC member | FSC members, from the FSC page | 60 | 500 | 2,000 a month | 3 | by membership |
+| Pay as you go | a Cycles IQ account; booked on the API page of the app (app.cyclesiq.com, Account > API) | 300 | 20,000 (safety cap) | none; billed per token, capped by your own spending limit (default 50 EUR a month) | 50 | 50 |
+| Member | members of the Cycles IQ Membership and the Cycles IQ Pro Membership, set on the account when they join | 600 | 50,000 (safety cap) | none; billed per token at half the price, capped by your own spending limit | 100 | 75 |
+| Scale | by agreement | 1,500 | 100,000 (safety cap) | none | 500 | 100 |
 
-PRO features: `dominantPeakFinder`, `CycleSpectrumPeakFinder` (`useStability` is open to every plan since 8 October
-2026). Market data is part of no plan: the symbol search, the analyses of markets by id and the raw
+Every analysis option is open to every plan: `dominantPeakFinder` and `CycleSpectrumPeakFinder` since 5 November 2026,
+`useStability` since 8 October 2026. Market data is part of no plan: the symbol search, the analyses of markets by id and the raw
 bars need the feature `MarketDataAccess`, granted on request to known customers (one rule for the REST API
 and the MCP server since 31 October 2026). Read the current numbers from `GET /api/me/limits` rather than
 hard-coding them.
@@ -179,7 +179,7 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 | POST | `/api/cycles/CycleScanner` | Full cycle spectrum: every significant cycle with length, strength, phase; `includeConsensus=true` adds the consensus of exactly these cycles |
 | POST | `/api/cycles/CycleDetails` | One cycle on a series: its profitability, stability and highlighter for the phase you give |
 | POST | `/api/cycles/CycleExplorer` | The dominant cycle in a length window, projected forward |
-| POST | `/api/cycles/CycleSpectrumPeakFinder` | Rank the peaks of a spectrum you already have *(PRO)* |
+| POST | `/api/cycles/CycleSpectrumPeakFinder` | Rank the peaks of a spectrum you already have (a CycleScanner spectrum) |
 | POST | `/api/CycleConsensus/calculate` | Cycle Consensus score (−100…+100) with per-cycle contributions and CRSI |
 | POST | `/api/DSP/CRSI` | Cyclic Smoothed RSI with dynamic upper/lower bands |
 | POST | `/api/DSP/CycleSwing` | Cycle swing (CSI): the acceleration of the dominant cycle, one value per bar |
@@ -256,12 +256,11 @@ Store the series once (`PUT /api/datasets/NAME`) when you run more than one of t
   between groups matter more than absolute values.
 - `bartelsValue`: statistical significance (higher is more significant); `bartelsLimit` filters it.
 - `stabilityScore` (0–1): **only computed with `useStability=true`** (every plan since 8 October 2026); otherwise 0.
-  `dominantRank` (1 = most dominant, 0 = unranked): **only with `dominantPeakFinder=true` and a plan with the PRO
-  features (the trial, Pay as you go, Member, Scale)**; otherwise 0 and `license` says the step was skipped. Never filter on a
-  field that was not computed, or every cycle disappears.
-- `dominantPeakFinder` (with `dominantPeakFinder=true`): what became of the ranking. `ranked`; `skipped` (no PRO
-  features, `license` says why: rank by `strength`); `failed` (the ranking did not answer this time, so every
-  `dominantRank` is 0 for that reason: call once more).
+  `dominantRank` (1 = most dominant, 0 = unranked): **only with `dominantPeakFinder=true`** (every plan since 5 November
+  2026); otherwise 0. Never filter on a field that was not computed, or every cycle disappears.
+- `dominantPeakFinder` (with `dominantPeakFinder=true`): what became of the ranking. `ranked`; `skipped` (the ranking
+  named none of the listed cycles, or the scan had no spectrum; `license` says why: rank by `strength`); `failed` (the
+  ranking did not answer this time, so every `dominantRank` is 0 for that reason: call once more).
 - Two phase groups, never mixed: average (`avgPhaseStatus`, `avgPhaseScore`, `minBarNum`) for scoring
   and regime; current (`phaseStatus`, `phaseScore`, `minBarNumCurrent`) for timing and projection.
   See **Phase strings and scores** below.
@@ -352,8 +351,8 @@ from each. Full detail: `references/phase-guide.md`.
 
 | Pitfall | Fix |
 |---|---|
-| Filtering on `stabilityScore` without `useStability`, or on `dominantRank` without `dominantPeakFinder` and the PRO features, discards every cycle | The field is 0 when its option did not run. Rank by `strength` and `bartelsValue` instead |
-| Every `dominantRank` 0 although `dominantPeakFinder=true` and the plan has the PRO features | Read the answer's `dominantPeakFinder`: `failed` means the ranking did not answer this time; call once more. With `ranked`, a `dominantPeakFinderBartels` above the cycles' `bartelsValue` leaves them unranked |
+| Filtering on `stabilityScore` without `useStability`, or on `dominantRank` without `dominantPeakFinder`, discards every cycle | The field is 0 when its option did not run. Rank by `strength` and `bartelsValue` instead |
+| Every `dominantRank` 0 although `dominantPeakFinder=true` | Read the answer's `dominantPeakFinder`: `failed` means the ranking did not answer this time; call once more. `skipped` means it named none of the listed cycles (`license` names the lengths): rank by `strength`. With `ranked`, a `dominantPeakFinderBartels` above the cycles' `bartelsValue` leaves them unranked |
 | Treating `strength` as a percentage | It is a raw spectral weight; compare peaks relative to each other |
 | Mixing the average and current phase fields | Use `avgPhase*` + `minBarNum` together, or `phase*` + `minBarNumCurrent` together |
 | Reading direction from the phase score sign | Read the phase string (`Uptrend_Starting` = −95) |
