@@ -26,6 +26,7 @@ authoritative: https://api.cyclesiq.com/specs/index.html?url=/apidocs/v1/swagger
 18. [CycleDetails](#18-cycledetails)
 19. [CycleSwing](#19-cycleswing)
 20. [TDSequential](#20-tdsequential)
+21. [composite](#21-composite)
 
 ---
 
@@ -534,3 +535,42 @@ Answer (`SequentialSetupSeries`): `buySignals`, `sellSignals` (true on the bar a
 count per bar, negative while the sell setup leads, 0 where nothing counts), `lastCount` (the count on the last bar),
 `lastIndex` (its index). Refused with 400 and the reason: 10 values or fewer, NaN or Infinity, a counting outside 2
 to 100. Rated 2 tokens plus the data points.
+
+---
+
+## 21. composite
+
+**POST** `/api/cycles/composite`
+
+The composite of the cycles you choose, as the Cycle Scanner and the Cycle Analyzer draw it: the route scans the series
+with the scanner's settings, takes the cycles you name (or the first n by a ranking) and adds up one wave per cycle,
+`amplitude × sin(phase − (barsAnalysed − i) × 2π / cycleLength)`, over the analysed bars and `ahead` bars further.
+
+**Use it when** you want the combined swing of several cycles and when it turns next.
+
+| Param | Type | Default | Meaning |
+|---|---|---|---|
+| `cycles` | string | — | The lengths to add up, from a scan's answer: `81,188`. Give `cycles` or `top`, not both |
+| `top` | int | `0` | Instead: the first n cycles of the scan by `rankBy` (1–20) |
+| `rankBy` | string | `strength` | With `top`: `strength`, `stability`, `rank` (runs the dominant-peak finder), `amplitude`, `bartels` |
+| `ahead` | int | `100` | Bars to project past the last bar (0–500; the Cycle Scanner page projects 150) |
+| `phase` | string | `average` | The phase of each wave: `average` (the apps' default) or `current` |
+| `skew` | number | `0` | Bends each wave (−0.99 to 0.99; 0 = the plain sine) |
+| `triangle` | bool | `false` | Triangle waves instead of sines (only with `skew=0`) |
+| `includeWaves` | bool | `false` | Add each cycle's own wave (at most 200,000 values in all) |
+| scan settings | | | `minCycleLength`, `maxCycleLength`, `bartelsLimit`, `cycleResolution`, `dType`, `epf`, `savgolSmoothing`, `savgolSmoothingSpectrum`, `sortByStrength`, `amplitudeMulti`, `dominantPeakFinderBartels`: as for CycleScanner; send the scan's own values to get the same cycles |
+
+Body: the series (at least 101 values), or `?datasetid=` with `maxbars`, `from` and `to` as for every analysis.
+
+Answer (`CompositeOfCyclesAnswer`): `selection` (what was chosen), `barsAnalysed`, `ahead`, `phase`; `cycles` (each with
+`requested`, `cycleLength`, `amplitude`, `phase`, `avgPhase`, `phaseUsed`, `bartelsValue`, `strength`, `stabilityScore`,
+`dominantRank`, and with `includeWaves` its `wave`); `composite` (`barsAnalysed + ahead` values around zero; index
+`barsAnalysed − 1` is the last bar); `turningPoints` (every top and bottom: `bar`, `barsFromLast` (0 = the last bar,
+negative in the past), `kind`, `value`); `nextTop`, `nextBottom` (the first after the last bar, or null when the projection
+reaches none); `amplitudeScale` (your `amplitudeMulti` times the scanner's own factor for small-value series: divide by
+it for the series' units); `license`. Refused with 400 and the reason: `cycles` and `top` both or neither, a length that
+is not among the scan's cycles (the message lists them), the scanner's own refusals (100 values or fewer, NaN or
+Infinity). Rated like a scan. Every plan; through MCP it is the tool `cycle_composite`, which returns the last 300
+analysed bars plus the projection unless `lastbars` says otherwise.
+
+The older `CycleComposite` route (PRO level) picks its own cycles; this route takes yours.

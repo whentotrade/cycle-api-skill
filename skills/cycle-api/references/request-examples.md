@@ -41,6 +41,9 @@ curl -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
 
 # 4. CRSI tuned to a 60-bar cycle (length = the full cycle; the RSI inside runs over 30 bars)
 curl -H "X-API-Key: $KEY" -X POST "$API/api/DSP/CRSI?datasetid=MYSERIES&length=60"
+
+# 5. The composite of two cycles from the scan, 100 bars ahead (or top=3&rankBy=stability)
+curl -H "X-API-Key: $KEY" -X POST "$API/api/cycles/composite?datasetid=MYSERIES&cycles=81,188&ahead=100"
 ```
 
 ---
@@ -115,6 +118,11 @@ crsi = call("POST", "/api/DSP/CRSI",
 last = crsi["crsi"][-1]
 state = "overbought" if last > crsi["ub"][-1] else "oversold" if last < crsi["lb"][-1] else "inside bands"
 print(round(last, 1), state)
+
+# 5. The composite of the three most stable cycles, and its next turns
+comp = call("POST", "/api/cycles/composite",
+            params={"datasetid": "MYSERIES", "top": 3, "rankBy": "stability", "ahead": 100}).json()
+print([c["cycleLength"] for c in comp["cycles"]], comp["nextTop"], comp["nextBottom"])
 ```
 
 ---

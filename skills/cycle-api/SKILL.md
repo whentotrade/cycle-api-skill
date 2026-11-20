@@ -5,7 +5,8 @@ description: >
   how to read every result. The API analyses the caller's own time series: send the values
   with each call or store them once as a dataset and name it with ?datasetid=; accounts with the
   feature MarketDataAccess also search the app's markets and analyse them by id. Covers cycle
-  scanning (CycleScanner), the dominant cycle with forward projection (CycleExplorer), DSP
+  scanning (CycleScanner), the dominant cycle with forward projection (CycleExplorer), the
+  composite of chosen cycles with its projection (composite), DSP
   filters (detrend, Savitzky-Golay, sinc smoothing, CRSI), trend turning points (RSD t-test),
   cycle-length clustering (KDE), the Cycle Consensus score, stored datasets, and limits/usage.
   Use this skill whenever the user asks to run cycle analysis, scan for cycles, find the
@@ -13,7 +14,7 @@ description: >
   consensus score, store a series for analysis, or interpret cycle phase, strength,
   stability, or CRSI signals. Trigger on phrases like "run cycle analysis", "what is the
   dominant cycle", "scan cycles", "detrend this data", "apply CRSI", "detect turning points",
-  "smooth this series", "what cycles exist in", "cycle spectrum", "consensus score",
+  "smooth this series", "what cycles exist in", "cycle spectrum", "composite cycle", "combine cycles", "consensus score",
   "bullish or bearish consensus", "cycle consensus", "CRSI signal", "cycle phase",
   "store my series", or any request involving the Cycles IQ API.
 ---
@@ -146,8 +147,8 @@ answered `403` with a message that names the feature; every analysis then takes 
 
 ## Using it through MCP
 
-The same API is an MCP server: `https://api.cyclesiq.com/mcp` (Streamable HTTP). Its 16 tools are the
-analyses of **your own data** (scanner, explorer, consensus, CRSI, DSP filters, RSD test, KDE, DTW
+The same API is an MCP server: `https://api.cyclesiq.com/mcp` (Streamable HTTP). Its 17 tools are the
+analyses of **your own data** (scanner, explorer, composite, consensus, CRSI, DSP filters, RSD test, KDE, DTW
 clustering of your datasets, store/list/get your datasets, `my_limits`, `help`) and, for accounts with
 the feature `MarketDataAccess`, the symbol search (`search_symbols`: its `symbolId` goes as `datasetid`
 to the analyses; the answers never carry prices there); a tool call is judged and counted like a direct
@@ -179,6 +180,7 @@ The rest of this skill applies unchanged: same parameters, same answers, same pi
 | POST | `/api/cycles/CycleScanner` | Full cycle spectrum: every significant cycle with length, strength, phase; `includeConsensus=true` adds the consensus of exactly these cycles |
 | POST | `/api/cycles/CycleDetails` | One cycle on a series: its profitability, stability and highlighter for the phase you give |
 | POST | `/api/cycles/CycleExplorer` | The dominant cycle in a length window, projected forward |
+| POST | `/api/cycles/composite` | The composite of the cycles you choose (lengths from a scan, or the first n by a ranking), projected forward, with its tops and bottoms |
 | POST | `/api/cycles/CycleSpectrumPeakFinder` | Rank the peaks of a spectrum you already have (a CycleScanner spectrum) |
 | POST | `/api/CycleConsensus/calculate` | Cycle Consensus score (−100…+100) with per-cycle contributions and CRSI |
 | POST | `/api/DSP/CRSI` | Cyclic Smoothed RSI with dynamic upper/lower bands |
@@ -207,14 +209,20 @@ Details, parameters and when to use each: `references/endpoints.md`.
 
 **What cycles are in this series?**
 `CycleScanner` → sort peaks by `strength` → drop `cycleLength < 30` → look for a clear strength gap
-between the leading peaks and the rest. Add `useStability=true` (every plan) and, in the trial, Pay as you go or Scale,
-`dominantPeakFinder=true`; prefer peaks with `stabilityScore >= 0.5` and, where ranked, `dominantRank > 0`. With
+between the leading peaks and the rest. Add `useStability=true` and `dominantPeakFinder=true` (both open to every
+plan); prefer peaks with `stabilityScore >= 0.5` and, where ranked, `dominantRank > 0`. With
 `includeConsensus=true` the same answer carries the consensus of exactly these cycles (`consensus`, the answer of
 `CycleConsensus/calculate`), so one call gives the cycles and the verdict.
 
 **Where is the dominant cycle and when does it turn?**
 `CycleExplorer` with a length window (`minCycleLength`, `maxCycleLength`) and `plotForward` → read
 `length`, `phase_status`, `nexttop`, `nextlow`. Add `includeTimeseries=true` for bar-by-bar values.
+
+**When do the chosen cycles turn together?**
+`CycleScanner` → pick the lengths → `composite?cycles=40,100&ahead=100` (or `top=3&rankBy=stability`) → read
+`nextTop` and `nextBottom` (`barsFromLast` = bars after the last value) and `turningPoints`. The route scans again, so
+send the scan's own settings (`minCycleLength`, `maxCycleLength`, `bartelsLimit`, `dType`, `cycleResolution`) to get
+the same cycles.
 
 **Is a turn building across many cycles?**
 `CycleConsensus/calculate` → `combinedScore`, `bullishConsensus`, `bearishConsensus`, the four phase
@@ -281,6 +289,14 @@ projected top/low), `lasttop` / `lastlow` (bars back), `phasingScore`, `cyclePro
 `barsused`, `statusCode`, `license`, and with `includeTimeseries=true` a `timeSeries` array of
 `{ price, smoothedPrice, date, dateUnix, dominantCycle, cycleHighlighter }`.
 
+### `CompositeOfCyclesAnswer` — composite
+
+Key fields: `cycles` (each chosen cycle: `cycleLength`, `amplitude`, `phase`, `avgPhase`, `phaseUsed`, `strength`,
+`stabilityScore`, `dominantRank`, `bartelsValue`), `composite` (one value per analysed bar, then `ahead` projected
+values, around zero; index `barsAnalysed - 1` is the last bar), `turningPoints` (`bar`, `barsFromLast`, `kind`
+top/bottom, `value`), `nextTop` / `nextBottom` (the first after the last bar, or null), `amplitudeScale` (divide by it
+for the series' units: the scan scales small-value series up), `selection`, `phase`, `license`.
+
 ### `ConsensusResponse` — CycleConsensus/calculate
 
 `combinedScore` (−100…+100, positive = bullish), `bullishConsensus` / `bearishConsensus` (the weighted
@@ -335,7 +351,7 @@ from each. Full detail: `references/phase-guide.md`.
 
 ## Constraints
 
-- At least **101 values** for the cycle analyses (CycleScanner, CycleExplorer, CyclePowerScanner,
+- At least **101 values** for the cycle analyses (CycleScanner, CycleExplorer, composite, CyclePowerScanner,
   CycleComposite, CycleConsensus/calculate): 100 values or fewer are refused. At least **11** for the DSP
   filters (Detrend, SavGol, SincSmoother) and the CRSI. RSDtest: more than twice its `window` (101 with
   the default window of 50).
@@ -343,6 +359,8 @@ from each. Full detail: `references/phase-guide.md`.
   consensus 15–400 by default.
 - Bartels limit 0–99: default 49 for CycleScanner and CycleExplorer, 10 for consensus. Lower
   includes weaker cycles.
+- composite: `cycles` or `top`, not both; at most 20 cycles; `ahead` 0–500; `skew` −0.99 to 0.99; each length must be
+  one of the scan's cycles (lengths with tenths need `cycleResolution=0.1` here too).
 - CRSI takes the **full** cycle as `length` (the RSI inside runs over half of it, the bands over twice it) and needs
   a little more than three repetitions of it: the bands start after the first 3 × length + 4 bars, so keep the
   length below **data length / 3** (at most (data length − 5) / 3), otherwise `ub` and `lb` come back as NaN.
@@ -359,6 +377,7 @@ from each. Full detail: `references/phase-guide.md`.
 | CRSI bands all NaN | The bands start after 3 × length + 4 bars: the length is above (data length − 5) / 3. Pick a shorter cycle or send more values |
 | Passing half the cycle to `DSP/CRSI` | `length` is the full cycle; the RSI inside already halves it, so half the cycle gives an RSI over a quarter of it |
 | Results differ from the Cycle Scanner app | The app detrends with HP filter (`dType=0`) and uses its own band and window; send the same settings. `dType=9` (no detrending) gives very different strengths and ranks. `dType=4` (one-sided HP) avoids end-of-series bias when the latest bars matter |
+| `composite` refuses a length taken from an earlier scan | The route scans again with its own parameters: send the scan's settings so the same cycles come back. The refusal lists the lengths it found |
 | Sending a bare array to `CycleConsensus/calculate` | It takes an object: `{"datapoints": [...], ...}` |
 | Body and `?datasetid=` in the same call | Refused with 400; send one or the other |
 | Retrying a `403` | It will not pass; the route or feature is outside your plan |
@@ -372,5 +391,5 @@ from each. Full detail: `references/phase-guide.md`.
 ## Building cycle applications
 
 This skill covers the API. For charts, dashboards and complete cycle applications built on it
-(composite cycle reconstruction, charting integration, phase visualization, continuous 0–100
-scoring methods), see the companion **cycle-tools** skill set.
+(charting integration, phase visualization, continuous 0–100 scoring methods), see the companion
+**cycle-tools** skill set. The composite of chosen cycles itself is the route `composite` above.
